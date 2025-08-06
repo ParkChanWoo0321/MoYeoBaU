@@ -17,13 +17,13 @@ public class AttachmentService {
         String filePath = "uploads/" + fileName; // 실제 환경에 맞게 경로 지정
         File dest = new File(filePath);
         file.transferTo(dest);
-
+        String url = "/uploads/" + fileName;
         Attachment attachment = Attachment.builder()
                 .fileName(fileName)
                 .filePath(filePath)
                 .fileSize(file.getSize())
+                .url(url)
                 .build();
-
         return attachmentRepository.save(attachment);
     }
 }
