@@ -1,10 +1,7 @@
 package com.example.seosancomplain.domain.complaint;
 
 import com.example.seosancomplain.domain.dashboard.DashboardResponseDto;
-import com.example.seosancomplain.dto.AdminReportDto;
-import com.example.seosancomplain.dto.ComplaintRequestDto;
-import com.example.seosancomplain.dto.ComplaintResponseDto;
-import com.example.seosancomplain.dto.MapPointDto;
+import com.example.seosancomplain.dto.*;
 import com.example.seosancomplain.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -62,7 +59,7 @@ public class ComplaintService {
                 .stream().map(this::toDto).collect(Collectors.toList());
     }
 
-    // 7. (관리자) 상태별 민원 목록
+    // 7. 상태별 민원 목록
     public List<ComplaintResponseDto> getByStatus(ComplaintStatus status) {
         return complaintRepository.findByStatus(status)
                 .stream().map(this::toDto).collect(Collectors.toList());
@@ -138,13 +135,42 @@ public class ComplaintService {
 
     public List<MapPointDto> getComplaintMapPoints() {
         List<Complaint> complaints = complaintRepository.findAll();
-        // 꼭 필요한 정보만 MapPointDto로 가공해서 반환
         return complaints.stream()
                 .map(c -> new MapPointDto(c.getLatitude(), c.getLongitude(), c.getCategory(), c.getStatus()))
                 .collect(Collectors.toList());
     }
 
-    // ====== 내부 유틸 ======
+    public List<RegionReportDto> getRegionReport(LocalDate from, LocalDate to) {
+        LocalDateTime start = from.atStartOfDay();
+        LocalDateTime end = to.plusDays(1).atStartOfDay();
+        List<Object[]> results = complaintRepository.countByAddressAndStatusBetween(start, end);
+        List<RegionReportDto> list = new ArrayList<>();
+        for (Object[] row : results) {
+            String address = (String) row[0];
+            ComplaintStatus status = (ComplaintStatus) row[1];
+            Long count = (Long) row[2];
+            list.add(new RegionReportDto(address, status, count));
+        }
+        return list;
+    }
+
+    public List<RegionPriorityDto> getPriorityRegions() {
+        List<Object[]> results = complaintRepository.topAddressByStatus(ComplaintStatus.PENDING);
+        List<RegionPriorityDto> list = new ArrayList<>();
+        for (Object[] row : results) {
+            String address = (String) row[0];
+            Long count = (Long) row[1];
+            list.add(new RegionPriorityDto(address, count));
+        }
+        return list;
+    }
+
+    public List<ComplaintResponseDto> getByCategory(ComplaintCategory category) {
+        return complaintRepository.findByCategory(category)
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
 
     // 본인확인(중복 로직 통합)
     private Complaint getVerifiedComplaint(Long id, String userName, String phoneNumber) {

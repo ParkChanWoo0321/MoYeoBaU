@@ -16,10 +16,17 @@ public class AttachmentService {
 
     public Attachment save(MultipartFile file) throws IOException {
         String fileName = FileUtil.generateUniqueFileName(Objects.requireNonNull(file.getOriginalFilename()));
-        String filePath = "uploads/" + fileName; // 실제 환경에 맞게 경로 지정
+
+        String dirPath = System.getProperty("user.dir") + File.separator + "uploads";
+        File dir = new File(dirPath);
+        if (!dir.exists()) dir.mkdirs();
+
+        String filePath = dirPath + File.separator + fileName;
         File dest = new File(filePath);
         file.transferTo(dest);
+
         String url = "/uploads/" + fileName;
+
         Attachment attachment = Attachment.builder()
                 .fileName(fileName)
                 .filePath(filePath)

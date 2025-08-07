@@ -12,6 +12,5 @@ public class ReportScheduler {
     @Scheduled(cron = "0 0 0 1 * ?")
     public void generateMonthlyReport() {
         log.info("월간 민원 리포트 생성 작업 실행!");
-        // 실제 통계/리포트 생성 로직 추가
     }
 }

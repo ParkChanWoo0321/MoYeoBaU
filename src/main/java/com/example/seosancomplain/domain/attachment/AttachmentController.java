@@ -18,6 +18,7 @@ public class AttachmentController {
             Attachment attachment = attachmentService.save(file);
             return ResponseEntity.ok(attachment);
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.badRequest().build();
         }
     }

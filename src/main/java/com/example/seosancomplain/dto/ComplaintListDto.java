@@ -11,5 +11,4 @@ import java.util.List;
 public class ComplaintListDto {
     private List<ComplaintResponseDto> complaints;
     private int totalCount;
-    // 필요시 페이지 번호, 전체 페이지 등 추가
 }

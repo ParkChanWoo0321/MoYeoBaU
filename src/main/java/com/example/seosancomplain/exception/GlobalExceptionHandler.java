@@ -12,7 +12,6 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new SimpleResponseDto(false, e.getMessage()));
     }
-
     @ExceptionHandler(Exception.class)
     public ResponseEntity<SimpleResponseDto> handleException(Exception e) {
         return ResponseEntity

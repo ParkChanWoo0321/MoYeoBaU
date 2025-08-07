@@ -15,9 +15,9 @@ public class Attachment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String fileName;    // 원본 파일명
-    private String filePath;    // 저장 경로
-    private Long fileSize;      // 파일 크기
+    private String fileName;
+    private String filePath;
+    private Long fileSize;
     private String url;
     private LocalDateTime uploadedAt;
 
