@@ -1,6 +1,7 @@
 package com.example.seosancomplain.domain.complaint;
 
 import com.example.seosancomplain.domain.dashboard.DashboardResponseDto;
+import com.example.seosancomplain.dto.ComplaintListDto;
 import com.example.seosancomplain.dto.ComplaintRequestDto;
 import com.example.seosancomplain.dto.ComplaintResponseDto;
 import com.example.seosancomplain.dto.MapPointDto;
@@ -24,13 +25,18 @@ public class ComplaintController {
         return ResponseEntity.ok(complaintService.createComplaint(dto));
     }
 
-    // 2. 내 민원 목록 조회 (본인확인)
+    // 2. 내 민원 목록 조회 (본인확인) → ComplaintListDto로 변경
     @GetMapping("/my")
-    public ResponseEntity<List<ComplaintResponseDto>> getMyComplaints(
+    public ResponseEntity<ComplaintListDto> getMyComplaints(
             @RequestParam String userName,
             @RequestParam String phoneNumber
     ) {
-        return ResponseEntity.ok(complaintService.getMyComplaints(userName, phoneNumber));
+        List<ComplaintResponseDto> list = complaintService.getMyComplaints(userName, phoneNumber);
+        ComplaintListDto dto = ComplaintListDto.builder()
+                .complaints(list)
+                .totalCount(list.size())
+                .build();
+        return ResponseEntity.ok(dto);
     }
 
     // 3. 내 민원 단건 조회 (본인확인)
@@ -63,7 +69,7 @@ public class ComplaintController {
         return ResponseEntity.noContent().build();
     }
 
-    // 6. 전체 민원 목록 (관리자/공용)
+    // 6. 전체 민원 목록 (관리자/공용) - 그대로 List로 반환
     @GetMapping("")
     public ResponseEntity<List<ComplaintResponseDto>> getAll() {
         return ResponseEntity.ok(complaintService.getAllComplaints());

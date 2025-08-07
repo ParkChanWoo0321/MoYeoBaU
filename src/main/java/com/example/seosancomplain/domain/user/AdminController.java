@@ -3,8 +3,10 @@ package com.example.seosancomplain.domain.user;
 import com.example.seosancomplain.domain.complaint.ComplaintService;
 import com.example.seosancomplain.domain.complaint.ComplaintStatus;
 import com.example.seosancomplain.dto.AdminReportDto;
+import com.example.seosancomplain.dto.ComplaintListDto;
 import com.example.seosancomplain.dto.ComplaintRequestDto;
 import com.example.seosancomplain.dto.ComplaintResponseDto;
+import com.example.seosancomplain.dto.ComplaintStatusUpdateDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -20,16 +22,26 @@ public class AdminController {
 
     private final ComplaintService complaintService;
 
-    // 전체 민원 목록
+    // 전체 민원 목록 (ComplaintListDto로 리턴)
     @GetMapping("/complaints")
-    public ResponseEntity<List<ComplaintResponseDto>> getAllComplaints() {
-        return ResponseEntity.ok(complaintService.getAllComplaints());
+    public ResponseEntity<ComplaintListDto> getAllComplaints() {
+        List<ComplaintResponseDto> list = complaintService.getAllComplaints();
+        ComplaintListDto dto = ComplaintListDto.builder()
+                .complaints(list)
+                .totalCount(list.size())
+                .build();
+        return ResponseEntity.ok(dto);
     }
 
-    // 특정 상태별 민원 목록 (예: 처리중)
+    // 특정 상태별 민원 목록 (ComplaintListDto로 리턴)
     @GetMapping("/complaints/status")
-    public ResponseEntity<List<ComplaintResponseDto>> getByStatus(@RequestParam ComplaintStatus status) {
-        return ResponseEntity.ok(complaintService.getByStatus(status));
+    public ResponseEntity<ComplaintListDto> getByStatus(@RequestParam ComplaintStatus status) {
+        List<ComplaintResponseDto> list = complaintService.getByStatus(status);
+        ComplaintListDto dto = ComplaintListDto.builder()
+                .complaints(list)
+                .totalCount(list.size())
+                .build();
+        return ResponseEntity.ok(dto);
     }
 
     // 민원 수정
@@ -46,6 +58,7 @@ public class AdminController {
         return ResponseEntity.noContent().build();
     }
 
+    // 관리자 대시보드/통계
     @GetMapping("/report")
     public ResponseEntity<AdminReportDto> getReport(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -53,5 +66,16 @@ public class AdminController {
     ) {
         AdminReportDto report = complaintService.getAdminReport(from, to);
         return ResponseEntity.ok(report);
+    }
+
+    // 민원 상태변경 (플로우차트에 명시된 관리자 기능)
+    @PatchMapping("/complaints/{id}/status")
+    public ResponseEntity<ComplaintResponseDto> updateStatus(
+            @PathVariable Long id,
+            @RequestBody ComplaintStatusUpdateDto statusUpdateDto
+    ) {
+        return ResponseEntity.ok(
+                complaintService.updateStatus(id, statusUpdateDto.getStatus())
+        );
     }
 }

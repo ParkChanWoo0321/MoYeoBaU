@@ -7,6 +7,6 @@ public class FileUtil {
         String ext = "";
         int dotIdx = originalName.lastIndexOf('.');
         if (dotIdx > 0) ext = originalName.substring(dotIdx);
-        return UUID.randomUUID().toString() + ext;
+        return UUID.randomUUID() + ext;
     }
 }
