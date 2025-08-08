@@ -1,4 +1,4 @@
-package com.example.seosancomplain.dto;
+package com.example.seosancomplain.domain.ai;
 
 import com.example.seosancomplain.domain.complaint.ComplaintCategory;
 import lombok.*;

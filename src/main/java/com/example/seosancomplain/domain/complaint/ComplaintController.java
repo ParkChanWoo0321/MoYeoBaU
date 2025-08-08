@@ -69,25 +69,21 @@ public class ComplaintController {
         return ResponseEntity.noContent().build();
     }
 
-    // 민원 목록
+    // 민원 목록 (공용)
     @GetMapping("")
     public ResponseEntity<List<ComplaintResponseDto>> getAll() {
         return ResponseEntity.ok(complaintService.getAllComplaints());
     }
 
-    // 대시보드 (전체요약)
+    // 대시보드 (전체 요약)
     @GetMapping("/dashboard")
-    public ResponseEntity<DashboardResponseDto> getDashboard() {
-        return ResponseEntity.ok(complaintService.getDashboardStats());
+    public ResponseEntity<DashboardResponseDto> getDashboard(
+            @RequestParam(value = "days", required = false) Integer days
+    ) {
+        return ResponseEntity.ok(complaintService.getDashboardStats(days));
     }
 
-    // 상태별 민원 목록 조회
-    @GetMapping("/status")
-    public ResponseEntity<List<ComplaintResponseDto>> getByStatus(@RequestParam ComplaintStatus status) {
-        return ResponseEntity.ok(complaintService.getByStatus(status));
-    }
-
-    // 지도
+    // 지도 (위치 포인트)
     @GetMapping("/map")
     public ResponseEntity<List<MapPointDto>> getComplaintMapPoints() {
         return ResponseEntity.ok(complaintService.getComplaintMapPoints());

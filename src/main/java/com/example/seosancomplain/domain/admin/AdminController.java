@@ -1,9 +1,15 @@
-package com.example.seosancomplain.domain.user;
+package com.example.seosancomplain.domain.admin;
 
 import com.example.seosancomplain.domain.complaint.ComplaintCategory;
 import com.example.seosancomplain.domain.complaint.ComplaintService;
+import com.example.seosancomplain.domain.complaint.ComplaintStatus;
+import com.example.seosancomplain.domain.region.RegionPriorityDto;
+import com.example.seosancomplain.domain.region.RegionReportDto;
 import com.example.seosancomplain.dto.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,17 +23,6 @@ import java.util.List;
 public class AdminController {
 
     private final ComplaintService complaintService;
-
-    // 전체 민원 목록
-    @GetMapping("/complaints")
-    public ResponseEntity<ComplaintListDto> getAllComplaints() {
-        List<ComplaintResponseDto> list = complaintService.getAllComplaints();
-        ComplaintListDto dto = ComplaintListDto.builder()
-                .complaints(list)
-                .totalCount(list.size())
-                .build();
-        return ResponseEntity.ok(dto);
-    }
 
     // 카테고리별 민원 상세보기
     @GetMapping("/complaints/category")
@@ -88,5 +83,49 @@ public class AdminController {
     @GetMapping("/priority")
     public ResponseEntity<List<RegionPriorityDto>> getPriorityRegions() {
         return ResponseEntity.ok(complaintService.getPriorityRegions());
+    }
+
+    // 오늘 리포트
+    @GetMapping("/report/daily")
+    public ResponseEntity<AdminReportDto> reportDaily(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
+        LocalDate d = (day == null) ? LocalDate.now() : day;
+        return ResponseEntity.ok(complaintService.getAdminReport(d, d));
+    }
+
+    // 월간 리포트
+    @GetMapping("/report/monthly")
+    public ResponseEntity<AdminReportDto> reportMonthly(@RequestParam String yearMonth) {
+        java.time.YearMonth ym = java.time.YearMonth.parse(yearMonth);
+        LocalDate from = ym.atDay(1);
+        LocalDate to   = ym.atEndOfMonth();
+        return ResponseEntity.ok(complaintService.getAdminReport(from, to));
+    }
+
+    // 카테고리별 상태 카운트 (기본: PENDING)
+    @GetMapping("/stats/category")
+    public ResponseEntity<List<CategoryStatDto>> categoryStats(
+            @RequestParam(defaultValue = "PENDING") ComplaintStatus status) {
+        return ResponseEntity.ok(complaintService.getCategoryStatsByStatus(status));
+    }
+
+    // 우선순위 민원 목록 (기본: PENDING, 5건)
+    @GetMapping("/priority/complaints")
+    public ResponseEntity<List<ComplaintMiniDto>> priorityComplaints(
+            @RequestParam(defaultValue = "PENDING") ComplaintStatus status,
+            @RequestParam(defaultValue = "5") int limit) {
+        return ResponseEntity.ok(complaintService.getPriorityComplaints(status, limit));
+    }
+
+    @GetMapping("/complaints/page")
+    public ResponseEntity<Page<ComplaintResponseDto>> getAllPage(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(defaultValue = "createdAt,DESC") String sort // "field,ASC|DESC"
+    ) {
+        String[] parts = sort.split(",");
+        Sort s = Sort.by(Sort.Direction.fromString(parts.length > 1 ? parts[1] : "DESC"), parts[0]);
+        return ResponseEntity.ok(complaintService.getAllPaged(PageRequest.of(page, size, s)));
     }
 }

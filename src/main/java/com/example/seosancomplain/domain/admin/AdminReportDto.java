@@ -1,4 +1,4 @@
-package com.example.seosancomplain.dto;
+package com.example.seosancomplain.domain.admin;
 
 import lombok.*;
 

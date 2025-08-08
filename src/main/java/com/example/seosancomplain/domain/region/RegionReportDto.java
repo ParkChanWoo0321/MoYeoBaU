@@ -1,4 +1,4 @@
-package com.example.seosancomplain.dto;
+package com.example.seosancomplain.domain.region;
 
 import com.example.seosancomplain.domain.complaint.ComplaintStatus;
 import lombok.AllArgsConstructor;
