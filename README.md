@@ -218,6 +218,12 @@
 ]
 ```
 
+주의: 아래 관리자 전용 API를 호출하기 위해서는 Basic Auth 인증이 필요합니다.
+
+Username: likelion
+
+Password: hanseo
+
 ## (관리자) 민원 수정
 
 ### Request
