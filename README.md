@@ -123,6 +123,7 @@
   "url": "/uploads/image.jpg",
   "uploadedAt": "2025-08-07T18:07:13"
 }
+---
 
 # 간편민원서비스 관리자 API 명세서
 
