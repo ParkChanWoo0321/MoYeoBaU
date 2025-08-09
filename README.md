@@ -1,19 +1,27 @@
-
 # 간편민원서비스 백엔드 API 명세서
 
-## 민원 등록
+---
 
-### Request
+## 공통
 
-* URL: `POST /api/complaints`
-* Body(JSON):
+* 날짜/시간 형식: `2025-08-09T00:46:40.228115600` (ISO-8601)
+* 카테고리: `ENVIRONMENT | ADMINISTRATION | FACILITY | SAFETY | OTHER`
+* 상태: `PENDING | IN_PROGRESS | COMPLETED`
+
+---
+
+## 사용자 API
+
+### 민원 등록
+
+**POST** `/api/complaints`
 
 ```json
 {
   "userName": "홍길동",
   "phoneNumber": "01012345678",
   "content": "도로에 쓰레기가 치워지지 않아요",
-  "address": "서산시 해미면",
+  "address": "해미면",
   "latitude": 36.7845,
   "longitude": 126.4532,
   "category": "ENVIRONMENT",
@@ -21,134 +29,60 @@
 }
 ```
 
-### Response
+**Response(201)** – 등록된 민원 정보 반환
 
-```json
-{
-  "id": 7,
-  "content": "도로에 쓰레기가 치워지지 않아요",
-  "address": "서산시 해미면",
-  "latitude": 36.7845,
-  "longitude": 126.4532,
-  "category": "ENVIRONMENT",
-  "status": "PENDING",
-  "imageUrl": "http://example.com/image.jpg",
-  "userName": "홍길동",
-  "phoneNumber": "01012345678",
-  "createdAt": "2025-08-07T18:18:29",
-  "updatedAt": "2025-08-07T18:18:29"
-}
-```
+---
 
-## 민원 목록 조회
+### 내가 접수한 민원 목록
 
-### Request
+**GET** `/api/complaints/my?userName={userName}&phoneNumber={phoneNumber}`
 
-* URL: `GET /api/complaints`
+* Response(200): complaints 배열 반환
 
-### Response
+---
 
-```json
-[
-  {
-    "id": 7,
-    "content": "도로에 쓰레기가 치워지지 않아요",
-    "address": "서산시 해미면",
-    "latitude": 36.7845,
-    "longitude": 126.4532,
-    "category": "ENVIRONMENT",
-    "status": "COMPLETED",
-    "imageUrl": "http://example.com/image.jpg",
-    "userName": "홍길동",
-    "phoneNumber": "01012345678",
-    "createdAt": "2025-08-07T18:18:29",
-    "updatedAt": "2025-08-07T18:18:37"
-  }
-]
-```
+### 내가 접수한 민원 상세
 
-## 내 민원 조회
+**GET** `/api/complaints/my/{id}?userName={userName}&phoneNumber={phoneNumber}`
 
-### Request
+---
 
-* URL: `GET /api/complaints/my?userName={userName}&phoneNumber={phoneNumber}`
+### 내가 접수한 민원 수정
 
-### Response
+**PATCH** `/api/complaints/my/{id}`
 
-```json
-{
-  "complaints": [{ ... }],
-  "totalCount": 1
-}
-```
+* Body: 등록 시와 동일 필드
 
-## 민원 상세 조회
+---
 
-### Request
+### 내가 접수한 민원 삭제
 
-* URL: `GET /api/complaints/my/{id}?userName={userName}&phoneNumber={phoneNumber}`
+**DELETE** `/api/complaints/my/{id}?userName={userName}&phoneNumber={phoneNumber}`
 
-### Response
+* Response: `204 No Content`
 
-```json
-{
-  "id": 7,
-  "content": "도로에 쓰레기가 치워지지 않아요",
-  "address": "서산시 해미면",
-  "latitude": 36.7845,
-  "longitude": 126.4532,
-  "category": "ENVIRONMENT",
-  "status": "COMPLETED",
-  "imageUrl": "http://example.com/image.jpg",
-  "userName": "홍길동",
-  "phoneNumber": "01012345678",
-  "createdAt": "2025-08-07T18:18:29",
-  "updatedAt": "2025-08-07T18:18:37"
-}
-```
+---
 
-## 민원 수정
+### 전체 민원 목록
 
-### Request
+**GET** `/api/complaints`
 
-* URL: `PATCH /api/complaints/my/{id}`
-* Body(JSON):
+---
 
-```json
-{
-  "userName": "홍길동",
-  "phoneNumber": "01012345678",
-  "content": "도로에 쓰레기가 치워지지 않아요",
-  "address": "서산시 해미면",
-  "latitude": 36.7845,
-  "longitude": 126.4532,
-  "category": "ENVIRONMENT",
-  "imageUrl": "http://example.com/test2.jpg"
-}
-```
+### 대시보드(전체 요약)
 
-## 민원 삭제
+**GET** `/api/complaints/dashboard`
 
-### Request
+* 통계 필드: totalCount, completedRate, categoryCounts 등
 
-* URL: `DELETE /api/complaints/my/{id}?userName={userName}&phoneNumber={phoneNumber}`
+---
 
-## 대시보드(전체 요약)
+### 서산 지역 리스트
 
-### Request
+**GET** `/api/regions/seosan`
 
-* URL: `GET /api/complaints/dashboard`
+* 문자열 배열(지역명) 반환
 
-### Response
-
-```json
-{
-  "totalCount": 1,
-  "completedRate": 100.0,
-  "categoryCounts": {"ENVIRONMENT": 1, "OTHER": 0, "ADMINISTRATION": 0, "SAFETY": 0, "FACILITY": 0},
-  "categoryRates": {"ENVIRONMENT": 100.0, "OTHER": 0.0, "ADMINISTRATION": 0.0, "SAFETY": 0.0, "FACILITY": 0.0}
-}
-```
 
 ## 민원 지도 조회
 
@@ -191,52 +125,76 @@
 }
 ```
 
-## 상태별 민원 조회
+# 간편민원서비스 관리자 API 명세서
 
-### Request
+**인증 정보**
+모든 관리자 API 호출 시 Basic Auth 필요
 
-* URL: `GET /api/complaints/status?status={status}`
+* **Username:** likelion
+* **Password:** hanseo
 
-### Response
+---
+
+## 우선순위 민원 목록
+
+**GET** `http://localhost:8080/api/admin/priority/complaints?status=PENDING&limit=5`
+
+**Authorization**: Basic Auth
+
+**Response (200)**
+
+```json
+[]
+```
+
+---
+
+## 카테고리별 상태 카운트
+
+**GET** `http://localhost:8080/api/admin/stats/category?status=IN_PROGRESS`
+
+**Authorization**: Basic Auth
+
+**Response (200)**
 
 ```json
 [
   {
-    "id": 7,
-    "content": "도로에 쓰레기가 치워지지 않아요",
-    "address": "서산시 해미면",
-    "latitude": 36.7845,
-    "longitude": 126.4532,
     "category": "ENVIRONMENT",
-    "status": "COMPLETED",
-    "imageUrl": "http://example.com/image.jpg",
-    "userName": "홍길동",
-    "phoneNumber": "01012345678",
-    "createdAt": "2025-08-07T18:18:29",
-    "updatedAt": "2025-08-07T18:18:37"
+    "count": 1
   }
 ]
 ```
 
-주의: 아래 관리자 전용 API를 호출하기 위해서는 Basic Auth 인증이 필요합니다.
+---
 
-Username: likelion
+## 관리자 민원 삭제
 
-Password: hanseo
+**DELETE** `http://localhost:8080/api/admin/complaints/9`
 
-## (관리자) 민원 수정
+**Authorization**: Basic Auth
 
-### Request
+**Response (204)**
 
-* URL: `PATCH /api/admin/complaints/{id}`
-* Body(JSON):
+```json
+```
+
+---
+
+## 관리자 민원 수정
+
+**PATCH** `http://localhost:8080/api/admin/complaints/9`
+
+**Authorization**: Basic Auth
+
+**Body (JSON)**
 
 ```json
 {
   "userName": "홍길동",
   "phoneNumber": "01012345678",
   "content": "도로에 쓰레기가 치워지지 않아요",
-  "address": "서산시 해미면",
+  "address": "해미면",
   "latitude": 36.7845,
   "longitude": 126.4532,
   "category": "ENVIRONMENT",
@@ -244,109 +202,206 @@ Password: hanseo
 }
 ```
 
-### Response
+**Response (200)**
 
 ```json
 {
-  "id": 7,
+  "id": 9,
   "content": "도로에 쓰레기가 치워지지 않아요",
-  "address": "서산시 해미면",
+  "address": "해미면",
   "latitude": 36.7845,
   "longitude": 126.4532,
   "category": "ENVIRONMENT",
-  "status": "COMPLETED",
+  "status": "PENDING",
   "imageUrl": "http://example.com/test2.jpg",
   "userName": "홍길동",
   "phoneNumber": "01012345678",
-  "createdAt": "2025-08-07T18:18:29",
-  "updatedAt": "2025-08-08T00:07:04"
+  "createdAt": "2025-08-09T00:46:40.228152",
+  "updatedAt": "2025-08-09T00:48:03.548793"
 }
 ```
 
-## (관리자) 민원 상태 수정
+---
 
-### Request
+## 관리자 민원 상태변경
 
-* URL: `PATCH /api/admin/complaints/{id}/status`
-* Body(JSON):
+**PATCH** `http://localhost:8080/api/admin/complaints/9/status`
+
+**Authorization**: Basic Auth
+
+**Body (JSON)**
+
+```json
+{ "status": "IN_PROGRESS" }
+```
+
+**Response (200)**
 
 ```json
 {
-  "status": "COMPLETED"
+  "id": 9,
+  "content": "도로에 쓰레기가 치워지지 않아요",
+  "address": "해미면",
+  "latitude": 36.7845,
+  "longitude": 126.4532,
+  "category": "ENVIRONMENT",
+  "status": "IN_PROGRESS",
+  "imageUrl": "http://example.com/test2.jpg",
+  "userName": "홍길동",
+  "phoneNumber": "01012345678",
+  "createdAt": "2025-08-09T00:46:40.228152",
+  "updatedAt": "2025-08-09T00:57:41.128106700"
 }
 ```
 
-### Response
+---
+
+## 페이징 목록
+
+**GET** `http://localhost:8080/api/admin/complaints/page?page=0&size=5&sort=createdAt,DESC`
+
+**Authorization**: Basic Auth
+
+**Response (200)**
 
 ```json
 {
-  "id": 7,
-  "status": "COMPLETED",
-  "updatedAt": "2025-08-08T00:07:04"
+  "content": [
+    {
+      "id": 9,
+      "content": "도로에 쓰레기가 치워지지 않아요",
+      "address": "해미면",
+      "latitude": 36.7845,
+      "longitude": 126.4532,
+      "category": "ENVIRONMENT",
+      "status": "IN_PROGRESS",
+      "imageUrl": "http://example.com/test2.jpg",
+      "userName": "홍길동",
+      "phoneNumber": "01012345678",
+      "createdAt": "2025-08-09T00:46:40.228152",
+      "updatedAt": "2025-08-09T00:57:41.128107"
+    }
+  ],
+  "pageable": { }
 }
 ```
 
-## (관리자) 민원 목록 조회
+---
 
-### Request
+## 지역별 월간/일간 리포트(지역)
 
-* URL: `GET /api/admin/complaints`
+**GET** `http://localhost:8080/api/admin/report/region?from=2025-08-01&to=2025-08-31`
 
-### Response
+**Authorization**: Basic Auth
+
+**Response (200)**
+
+```json
+[
+  {
+    "address": "해미면",
+    "status": "IN_PROGRESS",
+    "count": 1
+  }
+]
+```
+
+---
+
+## 카테고리별 민원 상세보기
+
+**GET** `http://localhost:8080/api/admin/complaints/category?category=ENVIRONMENT`
+
+**Authorization**: Basic Auth
+
+**Response (200)**
 
 ```json
 {
-  "complaints": [{ ... }],
+  "complaints": [
+    {
+      "id": 9,
+      "content": "도로에 쓰레기가 치워지지 않아요",
+      "address": "해미면",
+      "latitude": 36.7845,
+      "longitude": 126.4532,
+      "category": "ENVIRONMENT",
+      "status": "IN_PROGRESS",
+      "imageUrl": "http://example.com/test2.jpg",
+      "userName": "홍길동",
+      "phoneNumber": "01012345678",
+      "createdAt": "2025-08-09T00:46:40.228152",
+      "updatedAt": "2025-08-09T00:57:41.128107"
+    }
+  ],
   "totalCount": 1
 }
 ```
 
-## (관리자) 지역별 월간/일간 리포트 발행
+---
 
-### Request
+## 오늘 리포트
 
-* URL: `GET /api/admin/report?from={fromDate}&to={toDate}`
+**GET** `http://localhost:8080/api/admin/report/daily?day=2025-08-07`
 
-### Response
+**Authorization**: Basic Auth
+
+**Response (200)**
 
 ```json
 {
-  "totalCount": 1,
-  "completedCount": 1,
+  "totalCount": 0,
+  "completedCount": 0,
   "processingCount": 0,
   "pendingCount": 0
 }
 ```
 
-## (관리자) 카테고리별 민원 상세보기
+---
 
-### Request
+## 월간 리포트
 
-* URL: `GET /api/admin/complaints/category?category={category}`
+**GET** `http://localhost:8080/api/admin/report/monthly?yearMonth=2025-08`
 
-### Response
+**Authorization**: Basic Auth
+
+**Response (200)**
 
 ```json
 {
-  "complaints": [{ ... }],
-  "totalCount": 1
+  "totalCount": 1,
+  "completedCount": 0,
+  "processingCount": 1,
+  "pendingCount": 0
 }
 ```
 
-## (관리자) 우선순위별 지역 목록화
+---
 
-### Request
+## 전체 민원 목록 조회
 
-* URL: `GET /api/admin/priority`
+**GET** `http://localhost:8080/api/admin/complaints`
 
-### Response
+**Authorization**: Basic Auth
+
+**Response (200)**
 
 ```json
-[]
+[
+  {
+    "id": 9,
+    "content": "도로에 쓰레기가 치워지지 않아요",
+    "address": "해미면",
+    "latitude": 36.7845,
+    "longitude": 126.4532,
+    "category": "ENVIRONMENT",
+    "status": "IN_PROGRESS",
+    "imageUrl": "http://example.com/test2.jpg",
+    "userName": "홍길동",
+    "phoneNumber": "01012345678",
+    "createdAt": "2025-08-09T00:46:40.228152",
+    "updatedAt": "2025-08-09T00:57:41.128107"
+  }
+]
 ```
 
-## (관리자) 민원 삭제
-
-### Request
-
-* URL: `DELETE /api/admin/complaints/{id}`
