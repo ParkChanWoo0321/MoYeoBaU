@@ -163,7 +163,7 @@ public class ComplaintService {
         double averageResolutionPrev = round1(avgResolutionDays(prevFrom, prevTo));
         Double averageResolutionDelta = round1(averageResolutionDays - averageResolutionPrev);
 
-        // ✅ 지역 통계: Enum 기반으로 안전하게 집계
+        // 지역 통계: Enum 기반으로 안전하게 집계
         List<String> regions = SeosanRegion.names();
         List<Complaint> all = complaintRepository.findAll();
         List<RegionStatDto> regionStats = regions.stream()
