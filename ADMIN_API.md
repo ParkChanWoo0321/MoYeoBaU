@@ -6,11 +6,11 @@
 - [AI API 명세서](AI_API.md)
 
 ---
-**인증 정보**
-모든 관리자 API 호출 시 Basic Auth 필요
 
-* **Username:** likelion
-* **Password:** hanseo
+**인증 정보**
+모든 관리자 API 호출 시 암호 필요
+
+Headers -> X-ADMIN-SECRET : hanseo
 
 ---
 
