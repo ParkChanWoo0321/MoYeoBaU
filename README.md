@@ -1,2 +1,2 @@
-- [한국어 문서](README.ko.md)
-- [English Docs](README.en.md)
+- [USER API 명세서](USER_API.md)
+- [ADMIN API 명세서](ADMIN_API.md)
