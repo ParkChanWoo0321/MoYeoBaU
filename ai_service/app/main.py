@@ -1,13 +1,10 @@
-# ai_service/app/main.py
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import re
 
-# 1) app을 먼저 만든다
 app = FastAPI(title="Seosan AI Service (MVP)")
 
-# 2) 그 다음 미들웨어 추가
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],  # 필요하면 "*" 추가

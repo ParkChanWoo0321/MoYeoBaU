@@ -7,12 +7,15 @@ import com.example.seosancomplain.domain.region.RegionPriorityDto;
 import com.example.seosancomplain.domain.region.RegionReportDto;
 import com.example.seosancomplain.dto.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -23,6 +26,20 @@ import java.util.List;
 public class AdminController {
 
     private final ComplaintService complaintService;
+
+    @Value("${admin.secret}")
+    private String adminSecret;
+
+    @ModelAttribute
+    public void verifyAdmin(
+            @RequestHeader(value = "X-ADMIN-SECRET", required = false) String headerSecret,
+            @RequestParam(value = "adminSecret", required = false) String paramSecret
+    ) {
+        String provided = (headerSecret != null && !headerSecret.isBlank()) ? headerSecret : paramSecret;
+        if (provided == null || !provided.equals(adminSecret)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "관리자 비밀번호가 올바르지 않습니다.");
+        }
+    }
 
     // 카테고리별 민원 상세보기
     @GetMapping("/complaints/category")
@@ -55,8 +72,7 @@ public class AdminController {
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        AdminReportDto report = complaintService.getAdminReport(from, to);
-        return ResponseEntity.ok(report);
+        return ResponseEntity.ok(complaintService.getAdminReport(from, to));
     }
 
     // 민원 상태변경
@@ -65,9 +81,7 @@ public class AdminController {
             @PathVariable Long id,
             @RequestBody ComplaintStatusUpdateDto statusUpdateDto
     ) {
-        return ResponseEntity.ok(
-                complaintService.updateStatus(id, statusUpdateDto.getStatus())
-        );
+        return ResponseEntity.ok(complaintService.updateStatus(id, statusUpdateDto.getStatus()));
     }
 
     // 지역별 월간 / 일간 리포트 발행
@@ -88,8 +102,7 @@ public class AdminController {
     // 오늘 리포트
     @GetMapping("/report/daily")
     public ResponseEntity<AdminReportDto> reportDaily(
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
         LocalDate d = (day == null) ? LocalDate.now() : day;
         return ResponseEntity.ok(complaintService.getAdminReport(d, d));
     }
@@ -122,7 +135,7 @@ public class AdminController {
     public ResponseEntity<Page<ComplaintResponseDto>> getAllPage(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
-            @RequestParam(defaultValue = "createdAt,DESC") String sort // "field,ASC|DESC"
+            @RequestParam(defaultValue = "createdAt,DESC") String sort
     ) {
         String[] parts = sort.split(",");
         Sort s = Sort.by(Sort.Direction.fromString(parts.length > 1 ? parts[1] : "DESC"), parts[0]);
