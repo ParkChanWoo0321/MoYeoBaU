@@ -1,5 +1,11 @@
 # 간편민원서비스 관리자 API 명세서
 
+---
+
+- [USER API 명세서](USER_API.md)
+- [AI API 명세서](AI_API.md)
+
+---
 **인증 정보**
 모든 관리자 API 호출 시 Basic Auth 필요
 
