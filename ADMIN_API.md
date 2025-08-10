@@ -7,7 +7,6 @@
 
 ---
 
-**인증 정보**
 모든 관리자 API 호출 시 암호 필요
 
 Headers -> X-ADMIN-SECRET : hanseo
