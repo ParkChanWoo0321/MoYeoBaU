@@ -17,7 +17,7 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **GET** `http://localhost:8080/api/admin/priority/complaints?status=PENDING&limit=5`
 
-**Authorization**: Basic Auth
+Headers -> X-ADMIN-SECRET : hanseo
 
 **Response (200)**
 
@@ -31,8 +31,8 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **GET** `http://localhost:8080/api/admin/stats/category?status=IN_PROGRESS`
 
-**Authorization**: Basic Auth
-
+Headers -> X-ADMIN-SECRET : hanseo
+ 
 **Response (200)**
 
 ```json
@@ -50,8 +50,8 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **DELETE** `http://localhost:8080/api/admin/complaints/9`
 
-**Authorization**: Basic Auth
-
+Headers -> X-ADMIN-SECRET : hanseo
+ 
 **Response (204)**
 
 ```json
@@ -63,7 +63,7 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **PATCH** `http://localhost:8080/api/admin/complaints/9`
 
-**Authorization**: Basic Auth
+Headers -> X-ADMIN-SECRET : hanseo
 
 **Body (JSON)**
 
@@ -105,7 +105,7 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **PATCH** `http://localhost:8080/api/admin/complaints/9/status`
 
-**Authorization**: Basic Auth
+Headers -> X-ADMIN-SECRET : hanseo
 
 **Body (JSON)**
 
@@ -138,8 +138,8 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **GET** `http://localhost:8080/api/admin/complaints/page?page=0&size=5&sort=createdAt,DESC`
 
-**Authorization**: Basic Auth
-
+Headers -> X-ADMIN-SECRET : hanseo
+ 
 **Response (200)**
 
 ```json
@@ -170,7 +170,7 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **GET** `http://localhost:8080/api/admin/report/region?from=2025-08-01&to=2025-08-31`
 
-**Authorization**: Basic Auth
+Headers -> X-ADMIN-SECRET : hanseo
 
 **Response (200)**
 
@@ -190,8 +190,8 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **GET** `http://localhost:8080/api/admin/complaints/category?category=ENVIRONMENT`
 
-**Authorization**: Basic Auth
-
+Headers -> X-ADMIN-SECRET : hanseo
+ 
 **Response (200)**
 
 ```json
@@ -222,8 +222,8 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **GET** `http://localhost:8080/api/admin/report/daily?day=2025-08-07`
 
-**Authorization**: Basic Auth
-
+Headers -> X-ADMIN-SECRET : hanseo
+ 
 **Response (200)**
 
 ```json
@@ -241,8 +241,8 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **GET** `http://localhost:8080/api/admin/report/monthly?yearMonth=2025-08`
 
-**Authorization**: Basic Auth
-
+Headers -> X-ADMIN-SECRET : hanseo
+ 
 **Response (200)**
 
 ```json
@@ -260,8 +260,8 @@ Headers -> X-ADMIN-SECRET : hanseo
 
 **GET** `http://localhost:8080/api/admin/complaints`
 
-**Authorization**: Basic Auth
-
+Headers -> X-ADMIN-SECRET : hanseo
+ 
 **Response (200)**
 
 ```json
