@@ -16,7 +16,7 @@
 
 ## 사용자 API
 
-### 민원 등록
+### 민원 접수
 
 **POST** `/api/complaints`
 
@@ -79,32 +79,6 @@
 
 * 통계 필드: totalCount, completedRate, categoryCounts 등
 
----
-
-### 서산 지역 리스트
-
-**GET** `/api/regions/seosan`
-
-* 문자열 배열(지역명) 반환
-
-
-## 민원 지도 조회
-
-### Request
-
-* URL: `GET /api/complaints/map`
-
-### Response
-
-```json
-[
-  {
-    "latitude": 36.7845,
-    "longitude": 126.4532,
-    "category": "ENVIRONMENT",
-    "status": "COMPLETED"
-  }
-]
 ```
 
 ## 사진 업로드
