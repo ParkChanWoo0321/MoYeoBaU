@@ -1,11 +1,16 @@
 # 간편민원서비스 **관리자용** API 명세서
 
+---
+- [USER API 명세서](USER_API.md)
+- [AI API 명세서](AI_API.md)
+---
+
 > Base URL: `http://localhost:8080`
 > 공통 헤더(모든 관리자 요청): `PASSWORD: hanseo`
 
 ---
 
-## 1) 민원 반려하기
+## 민원 반려하기
 
 **POST** `/api/admin/complaints/{id}/reject`
 
@@ -37,7 +42,7 @@
 
 ---
 
-## 2) 관리자 민원 수정
+## 관리자 민원 수정
 
 **PATCH** `/api/admin/complaints/{id}`
 
@@ -85,7 +90,7 @@
 
 ---
 
-## 3) 관리자 민원 삭제
+## 관리자 민원 삭제
 
 **DELETE** `/api/admin/complaints/{id}`
 
@@ -97,7 +102,7 @@
 
 ---
 
-## 4) 관리자 민원 상태 변경
+## 관리자 민원 상태 변경
 
 **PATCH** `/api/admin/complaints/{id}/status`
 
@@ -131,7 +136,7 @@
 
 ---
 
-## 5) 일간 리포트
+## 일간 리포트
 
 **GET** `/api/admin/report/daily?day=2025-08-13`
 
@@ -143,7 +148,7 @@
 
 ---
 
-## 6) 월간 리포트
+## 월간 리포트
 
 **GET** `/api/admin/report/monthly?yearMonth=2025-08`
 
@@ -155,7 +160,7 @@
 
 ---
 
-## 7) 카테고리별 미처리 민원 수
+## 카테고리별 미처리 민원 수
 
 **GET** `/api/admin/complaints/categories`
 
@@ -192,7 +197,7 @@
 
 ---
 
-## 8) 카테고리별 미처리 글 목록
+## 카테고리별 미처리 글 목록
 
 **GET** `/api/admin/complaints/category?category=ENVIRONMENT_CLEANING`
 
@@ -223,7 +228,7 @@
 
 ---
 
-## 9) 카테고리별 미처리 글 목록 (페이징)
+## 카테고리별 미처리 글 목록 (페이징)
 
 **GET** `/api/admin/complaints/by-category?category=TRAFFIC_PARKING&page=0&size=10`
 
@@ -262,7 +267,7 @@
 
 ---
 
-## 10) 관리자용 민원 상세 조회
+## 관리자용 민원 상세 조회
 
 **GET** `/api/admin/complaints/{id}`
 
@@ -295,7 +300,7 @@
 
 ---
 
-## 11) 관리자 댓글 등록
+## 관리자 댓글 등록
 
 **POST** `/api/admin/complaints/{id}/comments`
 
