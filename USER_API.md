@@ -10,7 +10,7 @@
 
 ---
 
-## 1) 지역 목록 조회 (민원 접수 창 내 지역 선택)
+## 지역 목록 조회 (민원 접수 창 내 지역 선택)
 
 **GET** `/api/regions/seosan`
 
@@ -36,7 +36,7 @@
 
 ---
 
-## 2) 사진 업로드
+## 사진 업로드
 
 **POST** `/api/attachments/upload`
 
@@ -60,7 +60,7 @@
 
 ---
 
-## 3) 민원 접수하기
+## 민원 접수하기
 
 **POST** `/api/complaints`
 
@@ -100,7 +100,7 @@
 
 ---
 
-## 4) 전체 민원 목록 조회
+## 전체 민원 목록 조회
 
 **GET** `/api/complaints`
 
@@ -133,7 +133,7 @@
 
 ---
 
-## 5) 대시보드(전체 요약)
+## 대시보드(전체 요약)
 
 **GET** `/api/complaints/dashboard`
 
@@ -236,7 +236,7 @@
 
 ---
 
-## 6) 내 민원 목록 조회
+## 내 민원 목록 조회
 
 **GET** `/api/complaints/my?userName=홍길동&phoneNumber=01012345678`
 
@@ -269,7 +269,7 @@
 
 ---
 
-## 7) 내 민원 단건 조회
+## 내 민원 단건 조회
 
 **GET** `/api/complaints/my/1?userName=홍길동&phoneNumber=01012345678`
 
@@ -297,7 +297,7 @@
 
 ---
 
-## 8) 내 민원 수정
+## 내 민원 수정
 
 **PATCH** `/api/complaints/my/1`
 
@@ -335,10 +335,10 @@
     "rejectionReason": "ALREADY_RESOLVED",
     "rejectionDetail": null
 }
-
+```
 ---
 
-## 9) 내 민원 삭제
+## 내 민원 삭제
 
 **DELETE** `/api/complaints/my/4?userName=홍길동&phoneNumber=01012345678`
 
@@ -353,7 +353,7 @@
 
 ---
 
-## 10) 다른 사람 글 보기 (공용)
+## 다른 사람 글 보기 (공용)
 
 **GET** `/api/complaints/1`
 
@@ -385,5 +385,3 @@
     "rejectionDetail": null
 }
 ```
-
----
