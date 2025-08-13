@@ -1,8 +1,8 @@
-package com.example.seosancomplain.domain.dashboard;
+package com.example.seosancomplain.domain.admin.dto;
 
 import com.example.seosancomplain.domain.complaint.ComplaintCategory;
-import com.example.seosancomplain.dto.ComplaintMiniDto;
 import com.example.seosancomplain.domain.region.RegionStatDto;
+import com.example.seosancomplain.dto.ComplaintMiniDto;
 import lombok.*;
 
 import java.util.List;

@@ -1,16 +1,16 @@
 package com.example.seosancomplain.domain.complaint;
 
-import com.example.seosancomplain.domain.dashboard.DashboardResponseDto;
-import com.example.seosancomplain.dto.ComplaintListDto;
-import com.example.seosancomplain.dto.ComplaintRequestDto;
-import com.example.seosancomplain.dto.ComplaintResponseDto;
-import com.example.seosancomplain.dto.MapPointDto;
+import com.example.seosancomplain.dto.ComplaintDetailDto;
+import com.example.seosancomplain.domain.admin.dto.DashboardResponseDto;
+import com.example.seosancomplain.dto.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/complaints")
@@ -60,13 +60,18 @@ public class ComplaintController {
 
     // 내 민원 삭제 (본인확인)
     @DeleteMapping("/my/{id}")
-    public ResponseEntity<Void> deleteMyComplaint(
+    public ResponseEntity<Map<String, Object>> deleteMyComplaint(
             @PathVariable Long id,
             @RequestParam String userName,
             @RequestParam String phoneNumber
     ) {
         complaintService.deleteMyComplaint(id, userName, phoneNumber);
-        return ResponseEntity.noContent().build();
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("success", true);
+        body.put("message", "민원이 정상적으로 삭제되었습니다.");
+
+        return ResponseEntity.ok(body);
     }
 
     // 민원 목록 (공용)
@@ -83,9 +88,9 @@ public class ComplaintController {
         return ResponseEntity.ok(complaintService.getDashboardStats(days));
     }
 
-    // 지도 (위치 포인트)
-    @GetMapping("/map")
-    public ResponseEntity<List<MapPointDto>> getComplaintMapPoints() {
-        return ResponseEntity.ok(complaintService.getComplaintMapPoints());
+    // 민원 내용 보기
+    @GetMapping("/{id}")
+    public ResponseEntity<ComplaintDetailDto> getPublicDetail(@PathVariable Long id) {
+        return ResponseEntity.ok(complaintService.getPublicComplaintDetail(id));
     }
 }

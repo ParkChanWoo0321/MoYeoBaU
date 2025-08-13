@@ -5,21 +5,30 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Getter @Setter @Builder
-@NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Complaint {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    @Column(name="title", length=200, nullable=false)
+    private String title;                 // 제목
     private String content;               // 민원 내용
-    private String address;               // 동네/주소(자유 입력 또는 행정구역 문자열)
-    private Double latitude;              // 위도
-    private Double longitude;             // 경도
+    private String address;               // 주소
+    @Enumerated(EnumType.STRING)
+    private RejectionReason rejectionReason;
+
+    @Column(length = 1000)
+    private String rejectionDetail;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "category", length = 64, nullable = false)
     private ComplaintCategory category;   // 카테고리
     @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 32, nullable = false)
     private ComplaintStatus status;       // 상태
 
     private String imageUrl;              // 첨부사진 URL
@@ -33,12 +42,18 @@ public class Complaint {
     private LocalDateTime updatedAt; // 마지막 수정 시간
     private LocalDateTime resolvedAt; // 처리완료로 전환된 시간
 
+    @Setter
+    @Getter
+    @Column(name = "summary", length = 600)
+    private String summary;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = this.createdAt;
         if (this.status == null) this.status = ComplaintStatus.PENDING;
     }
+
 
     @PreUpdate
     public void preUpdate() {

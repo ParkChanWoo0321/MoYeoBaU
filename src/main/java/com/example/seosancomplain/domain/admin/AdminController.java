@@ -1,24 +1,32 @@
 package com.example.seosancomplain.domain.admin;
 
+import com.example.seosancomplain.domain.admin.comment.AdminCommentDto;
+import com.example.seosancomplain.dto.ComplaintDetailDto;
+import com.example.seosancomplain.domain.admin.dto.ComplaintStatusUpdateDto;
+import com.example.seosancomplain.domain.admin.dto.CreateCommentRequest;
+import com.example.seosancomplain.domain.admin.dto.RejectRequestDto;
+import com.example.seosancomplain.domain.admin.dto.AdminReportDto;
+import com.example.seosancomplain.domain.admin.dto.CategoryCountDto;
 import com.example.seosancomplain.domain.complaint.ComplaintCategory;
 import com.example.seosancomplain.domain.complaint.ComplaintService;
-import com.example.seosancomplain.domain.complaint.ComplaintStatus;
-import com.example.seosancomplain.domain.region.RegionPriorityDto;
-import com.example.seosancomplain.domain.region.RegionReportDto;
+import com.example.seosancomplain.dto.ComplaintRequestDto;
+import com.example.seosancomplain.dto.ComplaintResponseDto;
 import com.example.seosancomplain.dto.*;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -30,9 +38,10 @@ public class AdminController {
     @Value("${admin.secret}")
     private String adminSecret;
 
+    // 모든 관리자 API에 공통 적용 (헤더: X-ADMIN-SECRET 또는 쿼리: adminSecret)
     @ModelAttribute
     public void verifyAdmin(
-            @RequestHeader(value = "X-ADMIN-SECRET", required = false) String headerSecret,
+            @RequestHeader(value = "PASSWORD", required = false) String headerSecret,
             @RequestParam(value = "adminSecret", required = false) String paramSecret
     ) {
         String provided = (headerSecret != null && !headerSecret.isBlank()) ? headerSecret : paramSecret;
@@ -52,6 +61,24 @@ public class AdminController {
         return ResponseEntity.ok(dto);
     }
 
+    // 카테고리별 미처리 건수
+    @GetMapping("/complaints/categories")
+    public ResponseEntity<List<CategoryCountDto>> getCategoryCardsAdmin(
+            @RequestParam(required = false) Boolean ignoredPendingOnly
+    ) {
+        return ResponseEntity.ok(complaintService.getPendingCategoryCounts());
+    }
+
+    // 카테고리별 목록(페이지네이션)
+    @GetMapping("/complaints/by-category")
+    public ResponseEntity<Page<ComplaintResponseDto>> getByCategoryAdmin(
+            @RequestParam ComplaintCategory category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(complaintService.getListByCategoryPaged(category, page, size));
+    }
+
     // 민원 수정
     @PatchMapping("/complaints/{id}")
     public ResponseEntity<ComplaintResponseDto> updateComplaint(@PathVariable Long id,
@@ -61,9 +88,12 @@ public class AdminController {
 
     // 민원 삭제
     @DeleteMapping("/complaints/{id}")
-    public ResponseEntity<Void> deleteComplaint(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> deleteComplaintByAdmin(@PathVariable Long id) {
         complaintService.deleteComplaint(id);
-        return ResponseEntity.noContent().build();
+        Map<String, Object> body = new HashMap<>();
+        body.put("success", true);
+        body.put("message", "민원이 정상적으로 삭제되었습니다.");
+        return ResponseEntity.ok(body);
     }
 
     // 관리자 대시보드 (전체요약)
@@ -84,22 +114,7 @@ public class AdminController {
         return ResponseEntity.ok(complaintService.updateStatus(id, statusUpdateDto.getStatus()));
     }
 
-    // 지역별 월간 / 일간 리포트 발행
-    @GetMapping("/report/region")
-    public ResponseEntity<List<RegionReportDto>> getRegionReport(
-            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
-    ) {
-        return ResponseEntity.ok(complaintService.getRegionReport(from, to));
-    }
-
-    // 우선순위별 지역 목록화
-    @GetMapping("/priority")
-    public ResponseEntity<List<RegionPriorityDto>> getPriorityRegions() {
-        return ResponseEntity.ok(complaintService.getPriorityRegions());
-    }
-
-    // 오늘 리포트
+    // 일간 리포트
     @GetMapping("/report/daily")
     public ResponseEntity<AdminReportDto> reportDaily(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
@@ -116,29 +131,33 @@ public class AdminController {
         return ResponseEntity.ok(complaintService.getAdminReport(from, to));
     }
 
-    // 카테고리별 상태 카운트 (기본: PENDING)
-    @GetMapping("/stats/category")
-    public ResponseEntity<List<CategoryStatDto>> categoryStats(
-            @RequestParam(defaultValue = "PENDING") ComplaintStatus status) {
-        return ResponseEntity.ok(complaintService.getCategoryStatsByStatus(status));
+    // AI 요약
+    @PostMapping("/complaints/{id}/ai-summary")
+    public Mono<ResponseEntity<Map<String, Object>>> summarizeComplaint(@PathVariable Long id) {
+        return complaintService.summarizeAndSave(id)
+                .map(sum -> ResponseEntity.ok(Map.of("summary", sum)));
     }
 
-    // 우선순위 민원 목록 (기본: PENDING, 5건)
-    @GetMapping("/priority/complaints")
-    public ResponseEntity<List<ComplaintMiniDto>> priorityComplaints(
-            @RequestParam(defaultValue = "PENDING") ComplaintStatus status,
-            @RequestParam(defaultValue = "5") int limit) {
-        return ResponseEntity.ok(complaintService.getPriorityComplaints(status, limit));
+    // 상세(내용/이미지/댓글)
+    @GetMapping("/complaints/{id}")
+    public ResponseEntity<ComplaintDetailDto> getDetail(@PathVariable Long id) {
+        return ResponseEntity.ok(complaintService.getComplaintDetail(id));
     }
 
-    @GetMapping("/complaints/page")
-    public ResponseEntity<Page<ComplaintResponseDto>> getAllPage(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "5") int size,
-            @RequestParam(defaultValue = "createdAt,DESC") String sort
+    // 코멘트 작성
+    @PostMapping("/complaints/{id}/comments")
+    public ResponseEntity<AdminCommentDto> addComment(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateCommentRequest req) {
+        return ResponseEntity.ok(complaintService.addAdminComment(id, req.getContent()));
+    }
+
+    // 반려
+    @PostMapping("/complaints/{id}/reject")
+    public ResponseEntity<ComplaintResponseDto> reject(
+            @PathVariable Long id,
+            @Valid @RequestBody RejectRequestDto dto
     ) {
-        String[] parts = sort.split(",");
-        Sort s = Sort.by(Sort.Direction.fromString(parts.length > 1 ? parts[1] : "DESC"), parts[0]);
-        return ResponseEntity.ok(complaintService.getAllPaged(PageRequest.of(page, size, s)));
+        return ResponseEntity.ok(complaintService.rejectComplaint(id, dto.getReason(), dto.getDetail()));
     }
 }

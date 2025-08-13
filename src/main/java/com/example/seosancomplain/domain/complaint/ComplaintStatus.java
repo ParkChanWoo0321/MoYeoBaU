@@ -1,5 +1,3 @@
 package com.example.seosancomplain.domain.complaint;
 
-public enum ComplaintStatus {
-    RECEIVED, IN_PROGRESS, COMPLETED,PENDING
-}
+public enum ComplaintStatus { PENDING, IN_PROGRESS, COMPLETED, REJECTED }

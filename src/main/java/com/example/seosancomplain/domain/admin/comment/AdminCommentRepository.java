@@ -1,4 +1,4 @@
-package com.example.seosancomplain.domain.attachment;
+package com.example.seosancomplain.domain.admin.comment;
 
 import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -6,9 +6,9 @@ import org.springframework.data.jpa.repository.Modifying;
 
 import java.util.List;
 
-public interface AttachmentRepository extends JpaRepository<Attachment, Long> {
+public interface AdminCommentRepository extends JpaRepository<AdminComment, Long> {
     @Modifying
     @Transactional
     void deleteByComplaintId(Long complaintId);
-    List<Attachment> findByComplaintIdOrderByUploadedAtAsc(Long complaintId);
+    List<AdminComment> findByComplaintIdOrderByCreatedAtAsc(Long complaintId);
 }
