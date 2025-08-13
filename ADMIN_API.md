@@ -1,8 +1,10 @@
 # 간편민원서비스 **관리자용** API 명세서
 
 ---
-- [USER API 명세서](USER_API.md)
+
 - [AI API 명세서](AI_API.md)
+- [USER API 명세서](USER_API.md)
+  
 ---
 
 > Base URL: `http://localhost:8080`
