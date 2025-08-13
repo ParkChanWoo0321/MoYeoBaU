@@ -4,11 +4,10 @@
 
 - [ADMIN API 명세서](ADMIN_API.md)
 - [AI API 명세서](AI_API.md)
+---
 
 > Base URL: `http://localhost:8080`
 > Content-Type: 기본 `application/json`; 사진 업로드만 `multipart/form-data`
-
----
 
 ## 지역 목록 조회 (민원 접수 창 내 지역 선택)
 
