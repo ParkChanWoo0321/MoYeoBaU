@@ -271,7 +271,7 @@
 
 ## 내 민원 단건 조회
 
-**GET** `/api/complaints/my/1?userName=홍길동&phoneNumber=01012345678`
+**GET** `/api/complaints/my/{id}?userName=홍길동&phoneNumber=01012345678`
 
 **Response 200**
 
@@ -299,7 +299,7 @@
 
 ## 내 민원 수정
 
-**PATCH** `/api/complaints/my/1`
+**PATCH** `/api/complaints/my/{id}`
 
 **Request Body**
 
@@ -340,7 +340,7 @@
 
 ## 내 민원 삭제
 
-**DELETE** `/api/complaints/my/4?userName=홍길동&phoneNumber=01012345678`
+**DELETE** `/api/complaints/my/{id}?userName=홍길동&phoneNumber=01012345678`
 
 **Response 200**
 
@@ -355,7 +355,7 @@
 
 ## 다른 사람 글 보기 (공용)
 
-**GET** `/api/complaints/1`
+**GET** `/api/complaints/{id}`
 
 **Response 200**
 
