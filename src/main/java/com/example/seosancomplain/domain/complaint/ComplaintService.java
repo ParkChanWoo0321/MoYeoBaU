@@ -14,9 +14,6 @@ import com.example.seosancomplain.exception.CustomException;
 import com.example.seosancomplain.exception.ErrorCode;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -238,13 +235,6 @@ public class ComplaintService {
         return complaintRepository
                 .findByCategoryAndStatus(category, ComplaintStatus.PENDING)
                 .stream().map(this::toDto).toList();
-    }
-
-    public Page<ComplaintResponseDto> getListByCategoryPaged(ComplaintCategory category, int page, int size) {
-        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return complaintRepository
-                .findByCategoryAndStatus(category, ComplaintStatus.PENDING, pageable)
-                .map(this::toDto);
     }
 
     private Complaint getVerifiedComplaint(Long id, String userName, String phoneNumber) {

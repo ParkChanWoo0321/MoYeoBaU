@@ -1,7 +1,5 @@
 package com.example.seosancomplain.domain.complaint;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,10 +21,6 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
 
     long countByCategoryAndStatus(ComplaintCategory category, ComplaintStatus status);
     List<Complaint> findByCategoryAndStatus(ComplaintCategory category, ComplaintStatus status);
-
-    Page<Complaint> findByCategoryAndStatus(ComplaintCategory category,
-                                            ComplaintStatus status,
-                                            Pageable pageable);
     Optional<Complaint> findByIdAndStatus(Long id, ComplaintStatus status);
 
 }

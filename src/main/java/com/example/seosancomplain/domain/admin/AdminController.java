@@ -69,16 +69,6 @@ public class AdminController {
         return ResponseEntity.ok(complaintService.getPendingCategoryCounts());
     }
 
-    // 카테고리별 목록(페이지네이션)
-    @GetMapping("/complaints/by-category")
-    public ResponseEntity<Page<ComplaintResponseDto>> getByCategoryAdmin(
-            @RequestParam ComplaintCategory category,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        return ResponseEntity.ok(complaintService.getListByCategoryPaged(category, page, size));
-    }
-
     // 민원 수정
     @PatchMapping("/complaints/{id}")
     public ResponseEntity<ComplaintResponseDto> updateComplaint(@PathVariable Long id,
