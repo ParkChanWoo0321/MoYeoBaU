@@ -230,45 +230,6 @@
 
 ---
 
-## 카테고리별 미처리 글 목록 (페이징)
-
-**GET** `/api/admin/complaints/by-category?category=TRAFFIC_PARKING&page=0&size=10`
-
-**200 Response (예시)**
-
-```json
-{
-    "content": [],
-    "pageable": {
-        "pageNumber": 0,
-        "pageSize": 10,
-        "sort": {
-            "empty": false,
-            "sorted": true,
-            "unsorted": false
-        },
-        "offset": 0,
-        "paged": true,
-        "unpaged": false
-    },
-    "last": true,
-    "totalPages": 0,
-    "totalElements": 0,
-    "size": 10,
-    "number": 0,
-    "sort": {
-        "empty": false,
-        "sorted": true,
-        "unsorted": false
-    },
-    "first": true,
-    "numberOfElements": 0,
-    "empty": true
-}
-```
-
----
-
 ## 관리자용 민원 상세 조회
 
 **GET** `/api/admin/complaints/{id}`
