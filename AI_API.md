@@ -3,7 +3,9 @@
 - [USER API 명세서](USER_API.md)
 - [ADMIN API 명세서](ADMIN_API.md)
 ---
+
 > Base URL: `http://localhost:8080`
+> 공통 헤더(모든 관리자 요청): `PASSWORD: hanseo`
 
 ---
 
