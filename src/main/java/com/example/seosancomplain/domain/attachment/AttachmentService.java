@@ -7,6 +7,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -33,6 +35,28 @@ public class AttachmentService {
                 .fileSize(file.getSize())
                 .url(url)
                 .build();
+
         return attachmentRepository.save(attachment);
+    }
+
+    public List<Attachment> saveAll(List<MultipartFile> files) throws IOException {
+        List<Attachment> results = new ArrayList<>();
+        if (files == null || files.isEmpty()) return results;
+
+        for (MultipartFile file : files) {
+            if (file == null || file.isEmpty()) continue;
+            Attachment att = save(file);
+            results.add(att);
+        }
+        return results;
+    }
+
+    public List<String> saveAllAndReturnUrls(List<MultipartFile> files) throws IOException {
+        List<Attachment> atts = saveAll(files);
+        List<String> urls = new ArrayList<>(atts.size());
+        for (Attachment a : atts) {
+            urls.add(a.getUrl());
+        }
+        return urls;
     }
 }

@@ -11,4 +11,5 @@ public interface AttachmentRepository extends JpaRepository<Attachment, Long> {
     @Transactional
     void deleteByComplaintId(Long complaintId);
     List<Attachment> findByComplaintIdOrderByUploadedAtAsc(Long complaintId);
+    List<Attachment> findByUrlIn(List<String> urls);
 }

@@ -4,6 +4,8 @@ import com.example.seosancomplain.domain.complaint.ComplaintCategory;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
+import java.util.List;
+
 @Getter
 @Setter
 @Builder
@@ -16,7 +18,7 @@ public class ComplaintRequestDto {
     private String content;
     private String address;
     private ComplaintCategory category;
-    private String imageUrl;
+    private List<String> imageUrls;
     // 본인확인
     private String userName;
     private String phoneNumber;

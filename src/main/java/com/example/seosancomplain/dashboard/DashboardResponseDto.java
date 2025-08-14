@@ -1,7 +1,6 @@
-package com.example.seosancomplain.domain.admin.dto;
+package com.example.seosancomplain.dashboard;
 
 import com.example.seosancomplain.domain.complaint.ComplaintCategory;
-import com.example.seosancomplain.domain.region.RegionStatDto;
 import com.example.seosancomplain.dto.ComplaintMiniDto;
 import lombok.*;
 
@@ -26,5 +25,5 @@ public class DashboardResponseDto {
     private Map<ComplaintCategory, Double> categoryRates;
 
     private List<ComplaintMiniDto> latestFive; // 최신 5건
-    private List<RegionStatDto>    regionStats; // 지역 리스트(서산시 면/동)
+    private List<RegionTopDto>    regionTOP5; // 지역 리스트(서산시 면/동)
 }

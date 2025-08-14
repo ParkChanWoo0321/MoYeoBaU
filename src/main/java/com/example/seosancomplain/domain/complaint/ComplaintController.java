@@ -1,7 +1,6 @@
 package com.example.seosancomplain.domain.complaint;
 
-import com.example.seosancomplain.dto.ComplaintDetailDto;
-import com.example.seosancomplain.domain.admin.dto.DashboardResponseDto;
+import com.example.seosancomplain.dashboard.*;
 import com.example.seosancomplain.dto.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -80,17 +79,56 @@ public class ComplaintController {
         return ResponseEntity.ok(complaintService.getAllComplaints());
     }
 
-    // 대시보드 (전체 요약)
-    @GetMapping("/dashboard")
-    public ResponseEntity<DashboardResponseDto> getDashboard(
-            @RequestParam(value = "days", required = false) Integer days
+    // 파이차트
+    @GetMapping("/piechart")
+    public ResponseEntity<RegionPieResponse> getRegionPie(
+            @RequestParam(name = "days", required = false, defaultValue = "30") int days
     ) {
-        return ResponseEntity.ok(complaintService.getDashboardStats(days));
+        return ResponseEntity.ok(complaintService.computeRegionPie(days));
+    }
+
+    // Top5 리스트
+    @GetMapping("/region-top5")
+    public List<RegionTopDto> getRegionTop5(@RequestParam(defaultValue = "30") int days) {
+        return complaintService.computeRegionTop5(days);
     }
 
     // 민원 내용 보기
     @GetMapping("/{id}")
-    public ResponseEntity<ComplaintDetailDto> getPublicDetail(@PathVariable Long id) {
-        return ResponseEntity.ok(complaintService.getPublicComplaintDetail(id));
+    public ResponseEntity<ComplaintResponseDto> getPublicDetail(@PathVariable Long id) {
+        return ResponseEntity.ok(complaintService.getPublicComplaintAsResponse(id));
+    }
+
+    // 카테고리별 민원현황
+    @GetMapping("/categorystat")
+    public ResponseEntity<List<CategoryTrendItem>> getCategoryStat(
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(defaultValue = "true") boolean all
+    ) {
+        return ResponseEntity.ok(complaintService.getCategoryTrends(days, all));
+    }
+
+    // 카테고리별 글목록
+    @GetMapping("/categorylist")
+    public ResponseEntity<?> getComplaintsByCategory(
+            @RequestParam("category") ComplaintCategory category,
+            @RequestParam(name = "status", required = false, defaultValue = "ALL") String status,
+            @RequestParam(name = "days", required = false, defaultValue = "30") int days
+    ) {
+        return ResponseEntity.ok(complaintService.getPublicComplaintsByCategory(category, status, days));
+    }
+
+    @GetMapping("/analytics/kpi/resolution-rate")
+    public ResponseEntity<ResolutionRateDto> getResolutionRate(
+            @RequestParam(name = "days", defaultValue = "30") int days
+    ) {
+        return ResponseEntity.ok(complaintService.computeResolutionRate(days));
+    }
+
+    @GetMapping("/analytics/kpi/avg-handle-time")
+    public ResponseEntity<AvgHandleTimeDto> getAvgHandleTime(
+            @RequestParam(name = "days", defaultValue = "30") int days
+    ) {
+        return ResponseEntity.ok(complaintService.computeAvgHandleTime(days));
     }
 }

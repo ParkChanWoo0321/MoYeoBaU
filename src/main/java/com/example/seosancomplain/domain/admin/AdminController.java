@@ -1,6 +1,7 @@
 package com.example.seosancomplain.domain.admin;
 
 import com.example.seosancomplain.domain.admin.comment.AdminCommentDto;
+import com.example.seosancomplain.domain.complaint.Complaint;
 import com.example.seosancomplain.dto.ComplaintDetailDto;
 import com.example.seosancomplain.domain.admin.dto.ComplaintStatusUpdateDto;
 import com.example.seosancomplain.domain.admin.dto.CreateCommentRequest;
@@ -15,6 +16,9 @@ import com.example.seosancomplain.dto.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -148,5 +152,27 @@ public class AdminController {
             @Valid @RequestBody RejectRequestDto dto
     ) {
         return ResponseEntity.ok(complaintService.rejectComplaint(id, dto.getReason(), dto.getDetail()));
+    }
+
+    @GetMapping("/complaints/pending")
+    public ResponseEntity<ComplaintListDto> getAllPending(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort
+    ) {
+        String[] parts = sort.split(",");
+        String sortField = parts[0];
+        Sort.Direction direction = (parts.length > 1 && parts[1].equalsIgnoreCase("asc"))
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Page<Complaint> result = complaintService.getPendingAll(pageable);
+        List<ComplaintResponseDto> items = result.getContent().stream()
+                .map(ComplaintResponseDto::from)
+                .toList();
+        ComplaintListDto dto = ComplaintListDto.builder()
+                .complaints(items)
+                .totalCount((int) result.getTotalElements())
+                .build();
+        return ResponseEntity.ok(dto);
     }
 }
