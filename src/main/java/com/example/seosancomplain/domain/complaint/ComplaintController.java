@@ -125,7 +125,7 @@ public class ComplaintController {
         return ResponseEntity.ok(complaintService.computeResolutionRate(days));
     }
 
-    @GetMapping("/analytics/kpi/avg-handle-time")
+    @GetMapping("/avg-handle-time")
     public ResponseEntity<AvgHandleTimeDto> getAvgHandleTime(
             @RequestParam(name = "days", defaultValue = "30") int days
     ) {

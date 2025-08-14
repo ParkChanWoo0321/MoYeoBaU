@@ -50,6 +50,6 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
 """)
     List<CategoryCount> findTopCategoryByStatus(@Param("status") ComplaintStatus status, Pageable pageable);
 
-    // 해당 카테고리의 미처리 글 목록 (페이징)
+    // 해당 카테고리의 미처리 글 목록
     Page<Complaint> findByCategoryAndStatus(ComplaintCategory category, ComplaintStatus status, Pageable pageable);
 }

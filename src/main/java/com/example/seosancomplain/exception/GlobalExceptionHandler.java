@@ -1,5 +1,6 @@
 package com.example.seosancomplain.exception;
 
+import com.example.seosancomplain.domain.admin.comment.SimpleResponseDto;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 

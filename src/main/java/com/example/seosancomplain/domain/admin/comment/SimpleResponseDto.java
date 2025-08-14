@@ -1,4 +1,4 @@
-package com.example.seosancomplain.exception;
+package com.example.seosancomplain.domain.admin.comment;
 
 import lombok.*;
 
