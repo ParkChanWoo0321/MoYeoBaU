@@ -118,13 +118,15 @@ public class ComplaintController {
         return ResponseEntity.ok(complaintService.getPublicComplaintsByCategory(category, status, days));
     }
 
-    @GetMapping("/analytics/kpi/resolution-rate")
+    // 민원 처리율
+    @GetMapping("/resolution-rate")
     public ResponseEntity<ResolutionRateDto> getResolutionRate(
             @RequestParam(name = "days", defaultValue = "30") int days
     ) {
         return ResponseEntity.ok(complaintService.computeResolutionRate(days));
     }
 
+    // 평균 처리시간
     @GetMapping("/avg-handle-time")
     public ResponseEntity<AvgHandleTimeDto> getAvgHandleTime(
             @RequestParam(name = "days", defaultValue = "30") int days

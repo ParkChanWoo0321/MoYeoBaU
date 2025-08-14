@@ -327,14 +327,6 @@ public class ComplaintService {
                 .createdAt(saved.getCreatedAt().toString()).build();
     }
 
-// --------------------- 여기부터 변경 ---------------------
-
-    /**
-     * 파이차트용 지역 비율
-     * - 기간 내 총합(total) 기준 퍼센트 계산
-     * - 글이 없는 지역은 제외 (0건 필터링)
-     * - 제한 없이 "존재하는 지역 모두" 반환
-     */
     public RegionPieResponse computeRegionPie(int daysOpt) {
         int days = (daysOpt <= 0) ? 30 : daysOpt;
         LocalDateTime now = LocalDateTime.now();
@@ -342,7 +334,6 @@ public class ComplaintService {
 
         long curTotal = complaintRepository.countByCreatedAtBetween(curFrom, now);
 
-        // 전체가 0이면 빈 배열 반환
         if (curTotal == 0) {
             return RegionPieResponse.builder()
                     .total(0L)
@@ -361,14 +352,11 @@ public class ComplaintService {
                             .percent((cnt == 0) ? 0.0 : round1(cnt * 100.0 / curTotal))
                             .build();
                 })
-                // ✅ 0건 지역 제외
                 .filter(s -> s.getValue() > 0)
-                // 보기 좋게 개수 내림차순 정렬 (동률이면 이름 오름차순)
                 .sorted((a, b) -> {
                     int byCount = Long.compare(b.getValue(), a.getValue());
                     return (byCount != 0) ? byCount : a.getName().compareTo(b.getName());
                 })
-                // ✅ 제한 없음: 존재하는 지역 모두 반환
                 .toList();
 
         return RegionPieResponse.builder()
@@ -377,11 +365,6 @@ public class ComplaintService {
                 .build();
     }
 
-    /**
-     * 지역 Top5 (증감률 포함)
-     * - 현재 기간 내 0건 지역은 제외
-     * - 상위 5개만 반환
-     */
     public List<RegionTopDto> computeRegionTop5(int daysOpt) {
         int days = (daysOpt <= 0) ? 30 : daysOpt;
         LocalDateTime now = LocalDateTime.now();
@@ -402,9 +385,7 @@ public class ComplaintService {
                     return RegionTopDto.builder()
                             .region(r).count(curCnt).percent(percent).deltaPercent(deltaPct).up(up).build();
                 })
-                // ✅ 현재 기간에 0건인 지역 제외
                 .filter(dto -> dto.getCount() > 0)
-                // 개수 내림차순 → 이름 오름차순
                 .sorted((a, b) -> {
                     int byCount = Long.compare(b.getCount(), a.getCount());
                     return (byCount != 0) ? byCount : a.getRegion().compareTo(b.getRegion());
@@ -416,8 +397,6 @@ public class ComplaintService {
     private static double round1(double v) {
         return Math.round(v * 10.0) / 10.0;
     }
-
-// --------------------- 여기까지 변경 ---------------------
 
     @Transactional
     public ComplaintResponseDto rejectComplaint(Long id, RejectionReason reason, String detail) {
@@ -436,7 +415,7 @@ public class ComplaintService {
     public ComplaintResponseDto getPublicComplaintAsResponse(Long id) {
         var c = complaintRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("민원을 찾을 수 없습니다."));
-        return toDto(c); // 기존 목록/내 글 상세와 동일 구조
+        return toDto(c);
     }
 
     public List<CategoryOverviewItem> computeCategoryOverview(int daysOpt, boolean includeZero) {
@@ -451,7 +430,7 @@ public class ComplaintService {
         List<CategoryOverviewItem> items = new ArrayList<>();
         for (ComplaintCategory cat : ComplaintCategory.values()) {
             long cur = complaintRepository.countByCategoryAndCreatedAtBetween(cat, curFrom, now);
-            if (!includeZero && cur == 0) continue; // includeZero가 false면 0건 카테고리 제외
+            if (!includeZero && cur == 0) continue;
 
             long prev = complaintRepository.countByCategoryAndCreatedAtBetween(cat, prevFrom, curFrom);
             double percent = round1(cur * 100.0 / total);
@@ -475,10 +454,6 @@ public class ComplaintService {
         return items;
     }
 
-
-    /**
-     * 일반 사용자용: 카테고리별 글 목록 (status: ALL/PENDING/IN_PROGRESS/COMPLETED, 기본 30일)
-     */
     public List<ComplaintResponseDto> getPublicComplaintsByCategory(ComplaintCategory category, String statusOpt, int daysOpt) {
         int days = (daysOpt <= 0) ? 30 : daysOpt;
         LocalDateTime now = LocalDateTime.now();
@@ -492,7 +467,6 @@ public class ComplaintService {
             list = complaintRepository.findByCategoryAndStatusAndCreatedAtBetween(category, st, from, now);
         }
 
-        // 최신순
         list.sort(Comparator.comparing(Complaint::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed());
         return list.stream().map(this::toDto).toList();
     }
@@ -501,7 +475,7 @@ public class ComplaintService {
         return computeCategoryOverview(daysOpt, includeZero).stream()
                 .map(o -> CategoryTrendItem.builder()
                         .category(o.getCategory())
-                        .valuePercent(o.getDeltaPercent()) // 디자인은 증감률만 표시
+                        .valuePercent(o.getDeltaPercent())
                         .up(o.isUp())
                         .build())
                 .toList();
@@ -538,19 +512,17 @@ public class ComplaintService {
         LocalDateTime curFrom = now.minusDays(days);
         LocalDateTime prevFrom = curFrom.minusDays(days);
 
-        // 금기간: '해결된 시점'이 금기간인 완료 건들만 대상으로 평균 처리시간 계산
         List<Complaint> curResolved = complaintRepository.findByStatusAndResolvedAtBetween(
                 ComplaintStatus.COMPLETED, curFrom, now);
 
         double curDays = averageDays(curResolved);
 
-        // 전기간
         List<Complaint> prevResolved = complaintRepository.findByStatusAndResolvedAtBetween(
                 ComplaintStatus.COMPLETED, prevFrom, curFrom);
 
         double prevDays = averageDays(prevResolved);
 
-        double delta = round1(curDays - prevDays); // 감소(음수)면 성능 개선
+        double delta = round1(curDays - prevDays);
         boolean up = delta > 0;
 
         return AvgHandleTimeDto.builder()
@@ -560,7 +532,6 @@ public class ComplaintService {
                 .build();
     }
 
-    // 유틸
     private static double averageDays(List<Complaint> list) {
         if (list == null || list.isEmpty()) return 0.0;
         double sum = 0.0;
