@@ -41,7 +41,7 @@ public class AdminController {
     @Value("${admin.secret}")
     private String adminSecret;
 
-    // 모든 관리자 API에 공통 적용 (헤더: X-ADMIN-SECRET 또는 쿼리: adminSecret)
+    // 모든 관리자 API에 공통 적용
     @ModelAttribute
     public void verifyAdmin(
             @RequestHeader(value = "PASSWORD", required = false) String headerSecret,
@@ -89,7 +89,7 @@ public class AdminController {
         return ResponseEntity.ok(body);
     }
 
-    // 관리자 대시보드 (전체요약)
+    // 관리자 대시보드
     @GetMapping("/report")
     public ResponseEntity<AdminReportDto> getReport(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -154,6 +154,7 @@ public class AdminController {
         return ResponseEntity.ok(complaintService.rejectComplaint(id, dto.getReason(), dto.getDetail()));
     }
 
+    // 접수된 미처리 민원
     @GetMapping("/complaints/pending")
     public ResponseEntity<ComplaintListDto> getAllPending(
             @RequestParam(defaultValue = "0") int page,
@@ -173,6 +174,33 @@ public class AdminController {
                 .complaints(items)
                 .totalCount((int) result.getTotalElements())
                 .build();
+        return ResponseEntity.ok(dto);
+    }
+
+    // 긴급민원/다발민원
+    @GetMapping("/complaints/emergency")
+    public ResponseEntity<ComplaintListDto> getPendingOfTopCategory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort
+    ) {
+        String[] parts = sort.split(",");
+        String sortField = parts[0];
+        Sort.Direction direction = (parts.length > 1 && parts[1].equalsIgnoreCase("asc"))
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
+        Page<Complaint> result = complaintService.getTopCategoryPendingComplaints(pageable);
+
+        List<ComplaintResponseDto> items = result.getContent().stream()
+                .map(ComplaintResponseDto::from)
+                .toList();
+
+        ComplaintListDto dto = ComplaintListDto.builder()
+                .complaints(items)
+                .totalCount((int) result.getTotalElements())
+                .build();
+
         return ResponseEntity.ok(dto);
     }
 }

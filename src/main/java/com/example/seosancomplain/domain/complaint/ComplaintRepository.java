@@ -1,10 +1,13 @@
 package com.example.seosancomplain.domain.complaint;
 
+import com.example.seosancomplain.domain.admin.CategoryCount;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,5 +41,15 @@ public interface ComplaintRepository extends JpaRepository<Complaint, Long> {
             ComplaintStatus status, LocalDateTime start, LocalDateTime end);
 
     Page<Complaint> findByStatus(ComplaintStatus status, Pageable pageable);
-    Page<Complaint> findByStatusIn(Collection<ComplaintStatus> statuses, Pageable pageable);
+    @Query("""
+   select c.category as category, count(c) as cnt
+   from Complaint c
+   where c.status = :status
+   group by c.category
+   order by cnt desc
+""")
+    List<CategoryCount> findTopCategoryByStatus(@Param("status") ComplaintStatus status, Pageable pageable);
+
+    // 해당 카테고리의 미처리 글 목록 (페이징)
+    Page<Complaint> findByCategoryAndStatus(ComplaintCategory category, ComplaintStatus status, Pageable pageable);
 }

@@ -1,6 +1,7 @@
 package com.example.seosancomplain.domain.complaint;
 
 import com.example.seosancomplain.dashboard.*;
+import com.example.seosancomplain.domain.admin.CategoryCount;
 import com.example.seosancomplain.domain.admin.comment.AdminComment;
 import com.example.seosancomplain.domain.admin.comment.AdminCommentDto;
 import com.example.seosancomplain.domain.admin.comment.AdminCommentRepository;
@@ -18,6 +19,7 @@ import com.example.seosancomplain.exception.ErrorCode;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -576,5 +578,17 @@ public class ComplaintService {
 
     public Page<Complaint> getPendingAll(Pageable pageable) {
         return complaintRepository.findByStatus(ComplaintStatus.PENDING, pageable);
+    }
+
+    public Page<Complaint> getTopCategoryPendingComplaints(Pageable pageable) {
+        List<CategoryCount> top = complaintRepository.findTopCategoryByStatus(
+                ComplaintStatus.PENDING,
+                PageRequest.of(0, 1)
+        );
+        if (top.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        var topCategory = top.getFirst().getCategory();
+        return complaintRepository.findByCategoryAndStatus(topCategory, ComplaintStatus.PENDING, pageable);
     }
 }
