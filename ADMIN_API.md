@@ -251,16 +251,16 @@
     "category": "ENVIRONMENT_CLEANING",
     "status": "PENDING",
     "userName": "홍길동",
-    "phoneNumberMasked": "010-****-5678",
+    "phoneNumber": "01012345678",
     "address": "해미면",
     "imageUrls": [],
-    "createdAt": "2025-08-12T19:52:11.018746",
+    "createdAt": "2025-08-15T18:20:32.413387",
     "comments": [
         {
             "id": 1,
             "author": "관리자",
             "content": "현장 확인 예정입니다.",
-            "createdAt": "2025-08-13T17:41:00.942611"
+            "createdAt": "2025-08-15T21:09:35.098003"
         }
     ],
     "rejectionReason": "ALREADY_RESOLVED",
