@@ -204,7 +204,7 @@ public class ComplaintService {
                 .title(c.getTitle())
                 .content(c.getContent())
                 .address(c.getAddress())
-                .category(c.getCategory() != null ? c.getCategory().name() : null) // ← 수정
+                .category(c.getCategory() != null ? c.getCategory().name() : null)
                 .status(c.getStatus() != null ? c.getStatus().name() : null)
                 .imageUrls(buildImageUrlsFor(c))
                 .userName(c.getUserName())
