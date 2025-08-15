@@ -345,7 +345,7 @@
 
 ## 긴급/다발민원
 
-**POST** `/api/admin/complaints/emergency`
+**GET** `/api/admin/complaints/emergency`
 
 **200 Response (예시)**
 
