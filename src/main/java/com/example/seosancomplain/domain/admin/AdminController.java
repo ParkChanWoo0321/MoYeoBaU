@@ -1,7 +1,6 @@
 package com.example.seosancomplain.domain.admin;
 
 import com.example.seosancomplain.domain.admin.comment.AdminCommentDto;
-import com.example.seosancomplain.domain.complaint.Complaint;
 import com.example.seosancomplain.dto.ComplaintDetailDto;
 import com.example.seosancomplain.domain.admin.dto.ComplaintStatusUpdateDto;
 import com.example.seosancomplain.domain.admin.dto.CreateCommentRequest;
@@ -165,21 +164,23 @@ public class AdminController {
         String sortField = parts[0];
         Sort.Direction direction = (parts.length > 1 && parts[1].equalsIgnoreCase("asc"))
                 ? Sort.Direction.ASC : Sort.Direction.DESC;
+
         PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-        Page<Complaint> result = complaintService.getPendingAll(pageable);
-        List<ComplaintResponseDto> items = result.getContent().stream()
-                .map(ComplaintResponseDto::from)
-                .toList();
+
+        Page<ComplaintResponseDto> result = complaintService.getPendingListAsUnified(pageable);
+
         ComplaintListDto dto = ComplaintListDto.builder()
-                .complaints(items)
+                .complaints(result.getContent())
                 .totalCount((int) result.getTotalElements())
                 .build();
+
         return ResponseEntity.ok(dto);
     }
 
+
     // 긴급민원/다발민원
     @GetMapping("/complaints/emergency")
-    public ResponseEntity<ComplaintListDto> getPendingOfTopCategory(
+    public ResponseEntity<ComplaintListDto> getTopCategoryPending(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "createdAt,desc") String sort
@@ -190,14 +191,11 @@ public class AdminController {
                 ? Sort.Direction.ASC : Sort.Direction.DESC;
 
         PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, sortField));
-        Page<Complaint> result = complaintService.getTopCategoryPendingComplaints(pageable);
 
-        List<ComplaintResponseDto> items = result.getContent().stream()
-                .map(ComplaintResponseDto::from)
-                .toList();
+        Page<ComplaintResponseDto> result = complaintService.getTopCategoryPendingAsUnified(pageable);
 
         ComplaintListDto dto = ComplaintListDto.builder()
-                .complaints(items)
+                .complaints(result.getContent())
                 .totalCount((int) result.getTotalElements())
                 .build();
 

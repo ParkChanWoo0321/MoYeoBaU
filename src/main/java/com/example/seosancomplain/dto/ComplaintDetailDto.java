@@ -20,7 +20,7 @@ public class ComplaintDetailDto {
 
     // 작성자 영역
     private String userName;
-    private String phoneNumberMasked;
+    private String phoneNumber;
 
     // 이미지/주소
     private String address;

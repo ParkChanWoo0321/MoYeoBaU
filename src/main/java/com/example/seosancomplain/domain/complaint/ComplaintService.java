@@ -93,8 +93,11 @@ public class ComplaintService {
         return toDto(complaint);
     }
 
+    @Transactional
     public void deleteMyComplaint(Long id, String userName, String phoneNumber) {
         Complaint complaint = getVerifiedComplaint(id, userName, phoneNumber);
+        adminCommentRepository.deleteByComplaintId(id);
+        attachmentRepository.deleteByComplaintId(id);
         complaintRepository.delete(complaint);
     }
 
@@ -201,14 +204,14 @@ public class ComplaintService {
                 .title(c.getTitle())
                 .content(c.getContent())
                 .address(c.getAddress())
-                .category(c.getCategory())
-                .status(c.getStatus())
+                .category(c.getCategory() != null ? c.getCategory().name() : null) // ← 수정
+                .status(c.getStatus() != null ? c.getStatus().name() : null)
+                .imageUrls(buildImageUrlsFor(c))
                 .userName(c.getUserName())
-                .phoneNumber(c.getPhoneNumber())
+                .phoneNumber(formatPhone(c.getPhoneNumber()))
                 .createdAt(c.getCreatedAt() != null ? c.getCreatedAt().toString() : null)
                 .updatedAt(c.getUpdatedAt() != null ? c.getUpdatedAt().toString() : null)
-                .imageUrls(buildImageUrlsFor(c))
-                .rejectionReason(c.getRejectionReason())
+                .rejectionReason(c.getRejectionReason() != null ? c.getRejectionReason().name() : null)
                 .rejectionDetail(c.getRejectionDetail())
                 .build();
     }
@@ -282,12 +285,18 @@ public class ComplaintService {
                         .id(cm.getId()).author(cm.getAuthor()).content(cm.getContent())
                         .createdAt(cm.getCreatedAt().toString()).build())
                 .toList();
-        String maskedPhone = maskPhone(c.getPhoneNumber());
+
         return ComplaintDetailDto.builder()
-                .id(c.getId()).title(c.getTitle()).content(c.getContent())
-                .address(c.getAddress()).category(c.getCategory()).status(c.getStatus())
-                .userName(c.getUserName()).phoneNumberMasked(maskedPhone)
-                .imageUrls(imgs).createdAt(c.getCreatedAt() != null ? c.getCreatedAt().toString() : null)
+                .id(c.getId())
+                .title(c.getTitle())
+                .content(c.getContent())
+                .address(c.getAddress())
+                .category(c.getCategory())
+                .status(c.getStatus())
+                .userName(c.getUserName())
+                .phoneNumber(formatPhone(c.getPhoneNumber()))
+                .imageUrls(imgs)
+                .createdAt(c.getCreatedAt() != null ? c.getCreatedAt().toString() : null)
                 .comments(comments)
                 .rejectionReason(c.getRejectionReason())
                 .rejectionDetail(c.getRejectionDetail())
@@ -314,16 +323,12 @@ public class ComplaintService {
         return new ArrayList<>(set);
     }
 
-    private String maskPhone(String phone) {
-        if (phone == null || phone.isBlank()) return null;
+    private String formatPhone(String phone) {
+        if (phone == null) return null;
         String digits = phone.replaceAll("\\D", "");
-        int n = digits.length();
-        if (n >= 7) {
-            String head = digits.substring(0, 3);
-            String tail = digits.substring(n - 4);
-            return head + "-****-" + tail;
-        }
-        return "***";
+        if (digits.length() == 11) return digits.replaceFirst("(\\d{3})(\\d{4})(\\d{4})", "$1-$2-$3");
+        if (digits.length() == 10) return digits.replaceFirst("(\\d{3})(\\d{3})(\\d{4})", "$1-$2-$3");
+        return phone;
     }
 
     public AdminCommentDto addAdminComment(Long complaintId, String content) {
@@ -395,11 +400,10 @@ public class ComplaintService {
                     double percent = (curTotal == 0) ? 0.0 : round1(curCnt * 100.0 / curTotal);
                     double deltaPct = (prevCnt == 0 && curCnt == 0) ? 0.0
                             : round1((curCnt - prevCnt) * 100.0 / Math.max(prevCnt, 1));
-                    boolean up = (deltaPct > 0);
+                    boolean up = (curCnt > prevCnt);
                     return RegionTopDto.builder()
                             .region(r).count(curCnt).percent(percent).deltaPercent(deltaPct).up(up).build();
                 })
-                .filter(dto -> dto.getCount() > 0)
                 .sorted((a, b) -> {
                     int byCount = Long.compare(b.getCount(), a.getCount());
                     return (byCount != 0) ? byCount : a.getRegion().compareTo(b.getRegion());
@@ -561,10 +565,6 @@ public class ComplaintService {
         return round1(sum / n);
     }
 
-    public Page<Complaint> getPendingAll(Pageable pageable) {
-        return complaintRepository.findByStatus(ComplaintStatus.PENDING, pageable);
-    }
-
     public Page<Complaint> getTopCategoryPendingComplaints(Pageable pageable) {
         List<CategoryCount> top = complaintRepository.findTopCategoryByStatus(
                 ComplaintStatus.PENDING,
@@ -575,5 +575,14 @@ public class ComplaintService {
         }
         var topCategory = top.getFirst().getCategory();
         return complaintRepository.findByCategoryAndStatus(topCategory, ComplaintStatus.PENDING, pageable);
+    }
+
+    public Page<ComplaintResponseDto> getPendingListAsUnified(Pageable pageable) {
+        Page<Complaint> page = complaintRepository.findByStatus(ComplaintStatus.PENDING, pageable);
+        return page.map(this::toDto);
+    }
+
+    public Page<ComplaintResponseDto> getTopCategoryPendingAsUnified(Pageable pageable) {
+        return getTopCategoryPendingComplaints(pageable).map(this::toDto);
     }
 }
