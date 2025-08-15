@@ -48,15 +48,9 @@
 **Response 200**
 
 ```json
-{
-  "id": 1,
-  "fileName": "4a3725f0-b703-4757-8bdd-3b6e02658dff.jpg",
-  "filePath": "C:\\Users\\...\\uploads\\4a3725f0-b703-4757-8bdd-3b6e02658dff.jpg",
-  "fileSize": 1260,
-  "url": "/uploads/4a3725f0-b703-4757-8bdd-3b6e02658dff.jpg",
-  "uploadedAt": "2025-08-13T19:50:49.7238534",
-  "complaint": null
-}
+[
+    "/uploads/af5b0376-9bc4-49a7-93e1-2f9f2c6a3721.png"
+]
 ```
 
 ---
@@ -69,13 +63,13 @@
 
 ```json
 {
-  "title": "신고합니다",
-  "userName": "홍길동",
+  "title":"공원시설의 문제",
+  "userName": "김멋사",
   "phoneNumber": "01012345678",
-  "content": "도로에 쓰레기가 치워지지 않아요",
+  "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
   "address": "해미면",
-  "category": "ENVIRONMENT_CLEANING",
-  "imageUrls": "http://example.com/image.jpg"
+  "category": "FACILITY_DAMAGE",
+  "imageUrls": ["/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"]
 }
 ```
 
@@ -83,19 +77,23 @@
 
 ```json
 {
-    "id": 5,
-    "title": "신고합니다",
-    "content": "도로에 쓰레기가 치워지지 않아요",
+    "id": 4,
+    "title": "공원시설의 문제",
+    "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
     "address": "해미면",
-    "category": "ENVIRONMENT_CLEANING",
+    "category": "FACILITY_DAMAGE",
     "status": "PENDING",
-    "imageUrls": [],
-    "userName": "홍길동",
-    "phoneNumber": "01012345678",
-    "createdAt": "2025-08-13T19:42:45.796355800",
-    "updatedAt": "2025-08-13T19:42:45.796355800",
+    "imageUrls": [
+        "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
+    ],
+    "userName": "김멋사",
+    "phoneNumber": "010-1234-5678",
+    "createdAt": "2025-08-15T22:07:43.997826900",
+    "updatedAt": "2025-08-15T22:07:43.997826900",
     "rejectionReason": null,
-    "rejectionDetail": null
+    "rejectionDetail": null,
+    "comments": null,
+    "commentCount": null
 }
 ```
 
@@ -108,138 +106,92 @@
 **Response 200**
 
 ```json
-{
-    "complaints": [
-        {
-            "id": 1,
-            "title": "쓰레기",
-            "content": "도로에 쓰레기가 치워지지 않아요",
-            "address": "해미면",
-            "category": "ENVIRONMENT_CLEANING",
-            "status": "COMPLETED",
-            "imageUrls": [
-                "http://example.com/test2.jpg"
-            ],
-            "userName": "홍길동",
-            "phoneNumber": "01012345678",
-            "createdAt": "2025-08-12T19:52:11.018746",
-            "updatedAt": "2025-08-13T17:45:42.503380",
-            "rejectionReason": "ALREADY_RESOLVED",
-            "rejectionDetail": null
-        }
-    ],
-    "totalCount": 1
-}
+[
+    {
+        "id": 1,
+        "title": "신고합니다",
+        "content": "도로에 쓰레기가 치워지지 않아요",
+        "address": "해미면",
+        "category": "ENVIRONMENT_CLEANING",
+        "status": "PENDING",
+        "imageUrls": [],
+        "userName": "홍길동",
+        "phoneNumber": "010-1234-5678",
+        "createdAt": "2025-08-15T18:20:32.413387",
+        "updatedAt": "2025-08-15T21:07:20.237313",
+        "rejectionReason": "ALREADY_RESOLVED",
+        "rejectionDetail": null,
+        "comments": null,
+        "commentCount": null
+    },
+    {
+        "id": 2,
+        "title": "공원시설의 문제",
+        "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
+        "address": "해미면",
+        "category": "FACILITY_DAMAGE",
+        "status": "PENDING",
+        "imageUrls": [
+            "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
+        ],
+        "userName": "김멋사",
+        "phoneNumber": "010-1234-5678",
+        "createdAt": "2025-08-15T18:48:26.550027",
+        "updatedAt": "2025-08-15T18:48:26.550027",
+        "rejectionReason": null,
+        "rejectionDetail": null,
+        "comments": null,
+        "commentCount": null
+    },
+    {
+        "id": 3,
+        "title": "공원시설의 문제",
+        "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
+        "address": "해미면",
+        "category": "FACILITY_DAMAGE",
+        "status": "PENDING",
+        "imageUrls": [
+            "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
+        ],
+        "userName": "김멋사",
+        "phoneNumber": "010-1234-5678",
+        "createdAt": "2025-08-15T22:05:05.305184",
+        "updatedAt": "2025-08-15T22:05:05.305184",
+        "rejectionReason": null,
+        "rejectionDetail": null,
+        "comments": null,
+        "commentCount": null
+    },
+    {
+        "id": 4,
+        "title": "공원시설의 문제",
+        "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
+        "address": "해미면",
+        "category": "FACILITY_DAMAGE",
+        "status": "PENDING",
+        "imageUrls": [
+            "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
+        ],
+        "userName": "김멋사",
+        "phoneNumber": "010-1234-5678",
+        "createdAt": "2025-08-15T22:07:43.997827",
+        "updatedAt": "2025-08-15T22:07:43.997827",
+        "rejectionReason": null,
+        "rejectionDetail": null,
+        "comments": null,
+        "commentCount": null
+    }
+]
 ```
 
 ---
 
-## 대시보드(전체 요약)
-
-**GET** `/api/complaints/dashboard`
-
-**Response 200**
-
-```json
-{
-    "totalCount": 0,
-    "totalCountDelta": 0.0,
-    "completedRate": 0.0,
-    "completedRateDelta": 0.0,
-    "averageResolutionDays": 0.0,
-    "averageResolutionDelta": 0.0,
-    "categoryCounts": {
-        "FACILITY_DAMAGE": 0,
-        "LIVING_INCONVENIENCE": 0,
-        "ENVIRONMENT_CLEANING": 0,
-        "TRAFFIC_PARKING": 0,
-        "OTHERS_ADMIN": 0,
-        "SAFETY_RISK": 0
-    },
-    "categoryRates": {
-        "FACILITY_DAMAGE": 0.0,
-        "LIVING_INCONVENIENCE": 0.0,
-        "ENVIRONMENT_CLEANING": 0.0,
-        "TRAFFIC_PARKING": 0.0,
-        "OTHERS_ADMIN": 0.0,
-        "SAFETY_RISK": 0.0
-    },
-    "latestFive": [],
-    "regionStats": [
-        {
-            "region": "해미면",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "고북면",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "인지면",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "팔봉면",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "부석면",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "지곡면",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "운산면",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "성연면",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "음암면",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "부춘동",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "동문동",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "수석동",
-            "count": 0,
-            "rate": 0.0
-        },
-        {
-            "region": "석남동",
-            "count": 0,
-            "rate": 0.0
-        }
-    ]
-}
-```
 
 ---
 
 ## 내 민원 목록 조회
 
-**GET** `/api/complaints/my?userName=홍길동&phoneNumber=01012345678`
+**GET** `/api/complaints/my?userName=김멋사&phoneNumber=01012345678`
 
 **Response 200**
 
@@ -247,30 +199,70 @@
 {
     "complaints": [
         {
-            "id": 1,
-            "title": "쓰레기",
-            "content": "도로에 쓰레기가 치워지지 않아요",
+            "id": 2,
+            "title": "공원시설의 문제",
+            "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
             "address": "해미면",
-            "category": "ENVIRONMENT_CLEANING",
-            "status": "COMPLETED",
+            "category": "FACILITY_DAMAGE",
+            "status": "PENDING",
             "imageUrls": [
-                "http://example.com/test2.jpg"
+                "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
             ],
-            "userName": "홍길동",
-            "phoneNumber": "01012345678",
-            "createdAt": "2025-08-12T19:52:11.018746",
-            "updatedAt": "2025-08-13T17:45:42.503380",
-            "rejectionReason": "ALREADY_RESOLVED",
-            "rejectionDetail": null
+            "userName": "김멋사",
+            "phoneNumber": "010-1234-5678",
+            "createdAt": "2025-08-15T18:48:26.550027",
+            "updatedAt": "2025-08-15T18:48:26.550027",
+            "rejectionReason": null,
+            "rejectionDetail": null,
+            "comments": null,
+            "commentCount": null
+        },
+        {
+            "id": 3,
+            "title": "공원시설의 문제",
+            "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
+            "address": "해미면",
+            "category": "FACILITY_DAMAGE",
+            "status": "PENDING",
+            "imageUrls": [
+                "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
+            ],
+            "userName": "김멋사",
+            "phoneNumber": "010-1234-5678",
+            "createdAt": "2025-08-15T22:05:05.305184",
+            "updatedAt": "2025-08-15T22:05:05.305184",
+            "rejectionReason": null,
+            "rejectionDetail": null,
+            "comments": null,
+            "commentCount": null
+        },
+        {
+            "id": 4,
+            "title": "공원시설의 문제",
+            "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
+            "address": "해미면",
+            "category": "FACILITY_DAMAGE",
+            "status": "PENDING",
+            "imageUrls": [
+                "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
+            ],
+            "userName": "김멋사",
+            "phoneNumber": "010-1234-5678",
+            "createdAt": "2025-08-15T22:07:43.997827",
+            "updatedAt": "2025-08-15T22:07:43.997827",
+            "rejectionReason": null,
+            "rejectionDetail": null,
+            "comments": null,
+            "commentCount": null
         }
     ],
-    "totalCount": 1
+    "totalCount": 3
 }
 ```
 
 ---
 
-## 내 민원 단건 조회
+## 내 민원 확인
 
 **GET** `/api/complaints/my/{id}?userName=홍길동&phoneNumber=01012345678`
 
@@ -279,20 +271,20 @@
 ```json
 {
     "id": 1,
-    "title": "쓰레기",
+    "title": "신고합니다",
     "content": "도로에 쓰레기가 치워지지 않아요",
     "address": "해미면",
     "category": "ENVIRONMENT_CLEANING",
-    "status": "COMPLETED",
-    "imageUrls": [
-        "http://example.com/test2.jpg"
-    ],
+    "status": "PENDING",
+    "imageUrls": [],
     "userName": "홍길동",
-    "phoneNumber": "01012345678",
-    "createdAt": "2025-08-12T19:52:11.018746",
-    "updatedAt": "2025-08-13T17:45:42.503380",
+    "phoneNumber": "010-1234-5678",
+    "createdAt": "2025-08-15T18:20:32.413387",
+    "updatedAt": "2025-08-15T21:07:20.237313",
     "rejectionReason": "ALREADY_RESOLVED",
-    "rejectionDetail": null
+    "rejectionDetail": null,
+    "comments": null,
+    "commentCount": null
 }
 ```
 
@@ -306,13 +298,12 @@
 
 ```json
 {
-  "title": "쓰레기",
+  "title":"쓰레기",
   "userName": "홍길동",
   "phoneNumber": "01012345678",
   "content": "도로에 쓰레기가 치워지지 않아요",
   "address": "해미면",
-  "category": "ENVIRONMENT_CLEANING",
-  "imageUrls": "http://example.com/test2.jpg"
+  "category": "ENVIRONMENT_CLEANING"
 }
 ```
 
@@ -326,15 +317,15 @@
     "address": "해미면",
     "category": "ENVIRONMENT_CLEANING",
     "status": "PENDING",
-    "imageUrls": [
-        "http://example.com/test2.jpg"
-    ],
+    "imageUrls": [],
     "userName": "홍길동",
-    "phoneNumber": "01012345678",
-    "createdAt": "2025-08-12T19:52:11.018746",
-    "updatedAt": "2025-08-13T17:45:15.539135800",
+    "phoneNumber": "010-1234-5678",
+    "createdAt": "2025-08-15T18:20:32.413387",
+    "updatedAt": "2025-08-15T22:10:36.713704100",
     "rejectionReason": "ALREADY_RESOLVED",
-    "rejectionDetail": null
+    "rejectionDetail": null,
+    "comments": null,
+    "commentCount": null
 }
 ```
 ---
@@ -354,7 +345,7 @@
 
 ---
 
-## 다른 사람 글 보기 (공용)
+## 다른사람 글 보기
 
 **GET** `/api/complaints/{id}`
 
@@ -362,27 +353,236 @@
 
 ```json
 {
-    "id": 1,
-    "title": "쓰레기",
-    "content": "도로에 쓰레기가 치워지지 않아요",
-    "category": "ENVIRONMENT_CLEANING",
-    "status": "COMPLETED",
-    "userName": null,
-    "phoneNumberMasked": null,
+    "id": 2,
+    "title": "공원시설의 문제",
+    "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
     "address": "해미면",
+    "category": "FACILITY_DAMAGE",
+    "status": "PENDING",
     "imageUrls": [
-        "http://example.com/test2.jpg"
+        "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
     ],
-    "createdAt": "2025-08-12T19:52:11.018746",
-    "comments": [
+    "userName": "김멋사",
+    "phoneNumber": "010-1234-5678",
+    "createdAt": "2025-08-15T18:48:26.550027",
+    "updatedAt": "2025-08-15T18:48:26.550027",
+    "rejectionReason": null,
+    "rejectionDetail": null,
+    "comments": null,
+    "commentCount": null
+}
+```
+
+---
+
+## 대시보드 파이차트
+
+**GET** `/api/complaints/piechart`
+
+**Response 200**
+
+```json
+{
+    "total": 3,
+    "slices": [
         {
-            "id": 1,
-            "author": "관리자",
-            "content": "현장 확인 예정입니다.",
-            "createdAt": "2025-08-13T17:41:00.942611"
+            "name": "해미면",
+            "value": 3,
+            "percent": 100.0
         }
-    ],
-    "rejectionReason": "ALREADY_RESOLVED",
-    "rejectionDetail": null
+    ]
+}
+```
+
+---
+
+## 대시보드 top5
+
+**GET** `/api/complaints/region-top5`
+
+**Response 200**
+
+```json
+[
+    {
+        "region": "해미면",
+        "count": 3,
+        "percent": 100.0,
+        "deltaPercent": 300.0,
+        "up": true
+    },
+    {
+        "region": "고북면",
+        "count": 0,
+        "percent": 0.0,
+        "deltaPercent": 0.0,
+        "up": false
+    },
+    {
+        "region": "동문동",
+        "count": 0,
+        "percent": 0.0,
+        "deltaPercent": 0.0,
+        "up": false
+    },
+    {
+        "region": "부석면",
+        "count": 0,
+        "percent": 0.0,
+        "deltaPercent": 0.0,
+        "up": false
+    },
+    {
+        "region": "부춘동",
+        "count": 0,
+        "percent": 0.0,
+        "deltaPercent": 0.0,
+        "up": false
+    }
+]
+```
+
+---
+
+## 카테고리별 민원현황
+
+**GET** `/api/complaints/categorystat`
+
+**Response 200**
+
+```json
+[
+    {
+        "category": "FACILITY_DAMAGE",
+        "valuePercent": 300.0,
+        "up": true
+    },
+    {
+        "category": "ENVIRONMENT_CLEANING",
+        "valuePercent": 0.0,
+        "up": false
+    },
+    {
+        "category": "LIVING_INCONVENIENCE",
+        "valuePercent": 0.0,
+        "up": false
+    },
+    {
+        "category": "OTHERS_ADMIN",
+        "valuePercent": 0.0,
+        "up": false
+    },
+    {
+        "category": "SAFETY_RISK",
+        "valuePercent": 0.0,
+        "up": false
+    },
+    {
+        "category": "TRAFFIC_PARKING",
+        "valuePercent": 0.0,
+        "up": false
+    }
+]
+```
+
+---
+
+## 카테고리별 글 목록
+
+**GET** `/api/complaints/categorylist?category=FACILITY_DAMAGE&status=ALL&days=30`
+
+**Response 200**
+
+```json
+[
+    {
+        "id": 4,
+        "title": "공원시설의 문제",
+        "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
+        "address": "해미면",
+        "category": "FACILITY_DAMAGE",
+        "status": "PENDING",
+        "imageUrls": [
+            "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
+        ],
+        "userName": "김멋사",
+        "phoneNumber": "010-1234-5678",
+        "createdAt": "2025-08-15T22:07:43.997827",
+        "updatedAt": "2025-08-15T22:07:43.997827",
+        "rejectionReason": null,
+        "rejectionDetail": null,
+        "comments": null,
+        "commentCount": null
+    },
+    {
+        "id": 3,
+        "title": "공원시설의 문제",
+        "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
+        "address": "해미면",
+        "category": "FACILITY_DAMAGE",
+        "status": "PENDING",
+        "imageUrls": [
+            "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
+        ],
+        "userName": "김멋사",
+        "phoneNumber": "010-1234-5678",
+        "createdAt": "2025-08-15T22:05:05.305184",
+        "updatedAt": "2025-08-15T22:05:05.305184",
+        "rejectionReason": null,
+        "rejectionDetail": null,
+        "comments": null,
+        "commentCount": null
+    },
+    {
+        "id": 2,
+        "title": "공원시설의 문제",
+        "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
+        "address": "해미면",
+        "category": "FACILITY_DAMAGE",
+        "status": "PENDING",
+        "imageUrls": [
+            "/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
+        ],
+        "userName": "김멋사",
+        "phoneNumber": "010-1234-5678",
+        "createdAt": "2025-08-15T18:48:26.550027",
+        "updatedAt": "2025-08-15T18:48:26.550027",
+        "rejectionReason": null,
+        "rejectionDetail": null,
+        "comments": null,
+        "commentCount": null
+    }
+]
+```
+
+---
+
+## 민원 처리율
+
+**GET** `/api/complaints/resolution-rate`
+
+**Response 200**
+
+```json
+{
+    "ratePercent": 0.0,
+    "deltaPercent": 0.0,
+    "up": false
+}
+```
+
+---
+
+## 평균 처리 시간
+
+**GET** `/api/complaints/avg-handle-time`
+
+**Response 200**
+
+```json
+{
+    "days": 0.0,
+    "deltaDays": 0.0,
+    "up": false
 }
 ```
