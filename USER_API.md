@@ -43,7 +43,7 @@
 
 * Body: `form-data`
 
-  * Key: `file` (File) — 여러 파일 선택 가능 (화면에 "2 files" 표시)
+  * Key: `files` (File) — 여러 파일 선택 가능
 
 **Response 200**
 
