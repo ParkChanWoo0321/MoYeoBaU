@@ -13,6 +13,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,7 +29,7 @@ public class SummarizerClient {
     @Value("${ai.summarizer.endpoint:/summarize}")
     private String endpoint;
 
-    public Mono<SummarizeResponse> summarizeJson(String text, List<String> imageUrls) {
+    public Mono<FieldsResponse> summarizeFieldsJson(String text, List<String> imageUrls) {
         SummarizeRequest req = new SummarizeRequest();
         req.setComplaint_text(text == null ? "" : text);
         if (imageUrls != null) {
@@ -36,15 +37,21 @@ public class SummarizerClient {
                 req.getImages().add(new ImageInput(url, null));
             }
         }
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("response", "json");
+        meta.put("keys", "en"); // 🔹영문 키 요청
+        req.setMeta(meta);
+
         return webClient.post()
-                .uri(baseUrl + endpoint)
+                .uri(baseUrl + endpoint + "?format=json&keys=en") // 🔹영문 키 요청
                 .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
                 .bodyValue(req)
                 .retrieve()
-                .bodyToMono(SummarizeResponse.class);
+                .bodyToMono(FieldsResponse.class);
     }
 
-    public Mono<SummarizeResponse> summarizeMultipart(String text, List<byte[]> imageBytesList) {
+    public Mono<FieldsResponse> summarizeFieldsMultipart(String text, List<byte[]> imageBytesList) {
         MultipartBodyBuilder mb = new MultipartBodyBuilder();
         mb.part("complaint_text", text == null ? "" : text);
 
@@ -61,11 +68,12 @@ public class SummarizerClient {
         }
 
         return webClient.post()
-                .uri(baseUrl + endpoint)
+                .uri(baseUrl + endpoint + "?format=json&keys=en") // 🔹영문 키 요청
                 .contentType(MediaType.MULTIPART_FORM_DATA)
+                .accept(MediaType.APPLICATION_JSON)
                 .body(BodyInserters.fromMultipartData(mb.build()))
                 .retrieve()
-                .bodyToMono(SummarizeResponse.class);
+                .bodyToMono(FieldsResponse.class);
     }
 
     @Data
@@ -84,10 +92,11 @@ public class SummarizerClient {
     }
 
     @Data
-    public static class SummarizeResponse {
-        private String summary;
-        private String category;
-        private String urgency;
-        private Map<String, Object> evidence;
+    public static class FieldsResponse {
+        private String location;
+        private String phenomenon;
+        private String problem;
+        private String risk;
+        private String request;
     }
 }

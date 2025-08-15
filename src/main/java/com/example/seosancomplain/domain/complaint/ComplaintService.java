@@ -235,27 +235,41 @@ public class ComplaintService {
                         for (String p : local) {
                             try {
                                 bytes.add(java.nio.file.Files.readAllBytes(java.nio.file.Path.of(p)));
-                            } catch (Exception ignored) {
-                            }
+                            } catch (Exception ignored) {}
                         }
                         return bytes;
                     })
                     .subscribeOn(Schedulers.boundedElastic())
-                    .flatMap(images -> summarizerClient.summarizeMultipart(text, images))
+                    .flatMap(images -> summarizerClient.summarizeFieldsMultipart(text, images))
                     .map(res -> {
-                        c.setSummary(res.getSummary());
+                        String bullets = toBullets(res);
+                        c.setSummary(bullets);
                         complaintRepository.save(c);
-                        return res.getSummary();
+                        return bullets;
                     });
         }
 
-        return summarizerClient.summarizeJson(text, httpUrls)
+        return summarizerClient.summarizeFieldsJson(text, httpUrls)
                 .publishOn(Schedulers.boundedElastic())
                 .map(res -> {
-                    c.setSummary(res.getSummary());
+                    String bullets = toBullets(res);
+                    c.setSummary(bullets);
                     complaintRepository.save(c);
-                    return res.getSummary();
+                    return bullets;
                 });
+    }
+
+    private static String toBullets(SummarizerClient.FieldsResponse res) {
+        String l = res.getLocation() == null ? "" : res.getLocation();
+        String p1 = res.getPhenomenon() == null ? "" : res.getPhenomenon();
+        String p2 = res.getProblem() == null ? "" : res.getProblem();
+        String r = res.getRisk() == null ? "" : res.getRisk();
+        String rq = res.getRequest() == null ? "" : res.getRequest();
+        return "• Location: " + l + "\n"
+                + "• Phenomenon: " + p1 + "\n"
+                + "• Problem: " + p2 + "\n"
+                + "• Risk: " + r + "\n"
+                + "• Request: " + rq;
     }
 
     public ComplaintDetailDto getComplaintDetail(Long id) {

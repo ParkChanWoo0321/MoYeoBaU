@@ -16,6 +16,8 @@ public class Complaint {
     private Long id;
     @Column(name="title", length=200, nullable=false)
     private String title;                 // 제목
+    @Lob
+    @Column(nullable = false, columnDefinition = "MEDIUMTEXT")
     private String content;               // 민원 내용
     private String address;               // 주소
     @Enumerated(EnumType.STRING)

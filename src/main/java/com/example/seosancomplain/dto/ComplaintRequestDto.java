@@ -1,6 +1,8 @@
 package com.example.seosancomplain.dto;
 
 import com.example.seosancomplain.domain.complaint.ComplaintCategory;
+import jakarta.persistence.Column;
+import jakarta.persistence.Lob;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 

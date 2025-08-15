@@ -38,7 +38,7 @@ public class ComplaintResponseDto {
                 .address(c.getAddress())
                 .status(c.getStatus())
                 .category(ComplaintCategory.valueOf(c.getCategory().name()))
-                .createdAt(c.getCreatedAt().toString()) // 필요시 포맷터 적용
+                .createdAt(c.getCreatedAt().toString())
                 .build();
     }
 }

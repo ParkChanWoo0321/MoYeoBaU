@@ -13,7 +13,7 @@ import java.time.Duration;
 @Configuration
 public class WebClientConfig {
 
-    @Value("${ai.summarizer.timeout-ms:18000000}")
+    @Value("${ai.summarizer.timeout-ms:999999999}")
     long timeoutMs;
 
     @Bean
