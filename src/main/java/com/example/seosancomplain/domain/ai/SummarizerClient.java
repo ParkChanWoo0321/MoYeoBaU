@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
@@ -12,10 +13,8 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.Duration;
+import java.util.*;
 
 @Component
 @RequiredArgsConstructor
@@ -23,11 +22,11 @@ public class SummarizerClient {
 
     private final WebClient webClient;
 
-    @Value("${ai.summarizer.base-url}")
-    private String baseUrl;
-
     @Value("${ai.summarizer.endpoint:/summarize}")
     private String endpoint;
+
+    @Value("${ai.client.timeout-ms:120000}") // 👈 최종 가드 (클라이언트 레벨)
+    private long clientTimeoutMs;
 
     public Mono<FieldsResponse> summarizeFieldsJson(String text, List<String> imageUrls) {
         SummarizeRequest req = new SummarizeRequest();
@@ -42,13 +41,21 @@ public class SummarizerClient {
         meta.put("keys", "en"); // 🔹영문 키 요청
         req.setMeta(meta);
 
+        // baseUrl은 WebClientConfig에서 설정되어 있으므로 절대URL이 아닌 path만 사용
         return webClient.post()
-                .uri(baseUrl + endpoint + "?format=json&keys=en") // 🔹영문 키 요청
+                .uri(uriBuilder -> uriBuilder
+                        .path(endpoint)
+                        .queryParam("format", "json")
+                        .queryParam("keys", "en")
+                        .build())
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .bodyValue(req)
                 .retrieve()
-                .bodyToMono(FieldsResponse.class);
+                .onStatus(HttpStatusCode::isError,
+                        resp -> resp.createException().flatMap(Mono::error))
+                .bodyToMono(FieldsResponse.class)
+                .timeout(Duration.ofMillis(clientTimeoutMs)); // 👈 최종 가드
     }
 
     public Mono<FieldsResponse> summarizeFieldsMultipart(String text, List<byte[]> imageBytesList) {
@@ -68,12 +75,19 @@ public class SummarizerClient {
         }
 
         return webClient.post()
-                .uri(baseUrl + endpoint + "?format=json&keys=en") // 🔹영문 키 요청
+                .uri(uriBuilder -> uriBuilder
+                        .path(endpoint)
+                        .queryParam("format", "json")
+                        .queryParam("keys", "en")
+                        .build())
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(BodyInserters.fromMultipartData(mb.build()))
                 .retrieve()
-                .bodyToMono(FieldsResponse.class);
+                .onStatus(HttpStatusCode::isError,
+                        resp -> resp.createException().flatMap(Mono::error))
+                .bodyToMono(FieldsResponse.class)
+                .timeout(Duration.ofMillis(clientTimeoutMs)); // 👈 최종 가드
     }
 
     @Data

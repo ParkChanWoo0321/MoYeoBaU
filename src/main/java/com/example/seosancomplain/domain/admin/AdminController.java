@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -125,7 +126,7 @@ public class AdminController {
 
     // AI 요약
     @PostMapping("/complaints/{id}/ai-summary")
-    public Mono<ResponseEntity<Map<String, Object>>> summarizeComplaint(@PathVariable Long id) {
+    public Mono<ResponseEntity<Map<String, String>>> summarizeComplaint(@PathVariable Long id) {
         return complaintService.summarizeAndSave(id)
                 .map(sum -> ResponseEntity.ok(Map.of("summary", sum)));
     }

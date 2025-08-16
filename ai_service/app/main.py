@@ -1,34 +1,44 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import os, re, base64, importlib, requests, time, json
+import anyio
+from anyio import fail_after
+
+# anyio v3/v4 호환
+try:
+    from anyio import TimeoutError as AnyioTimeoutError
+except Exception:
+    try:
+        from anyio.exceptions import TimeoutError as AnyioTimeoutError
+    except Exception:
+        AnyioTimeoutError = TimeoutError
 
 app = FastAPI(title="Seosan AI Service (Ollama Summarizer)")
 
-# ===== 환경 변수(없으면 넉넉한 기본값) =====
 OLLAMA_BASE = os.getenv("OLLAMA_BASE", "http://127.0.0.1:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct")
-# 경량 폴백 모델(미설치면 자동 휴리스틱으로 폴백)
 OLLAMA_ALT_MODEL = os.getenv("OLLAMA_ALT_MODEL", "qwen2.5:3b-instruct")
 USE_KSS = os.getenv("USE_KSS", "0") in ("1", "true", "True")
 
-# 타임아웃/재시도: 크게 설정 (필요 시 환경변수로 조절)
-OLLAMA_CONNECT_TIMEOUT = int(os.getenv("OLLAMA_CONNECT_TIMEOUT", "60"))   # 연결 대기
-OLLAMA_READ_TIMEOUT    = int(os.getenv("OLLAMA_READ_TIMEOUT", "600"))     # 응답 대기
-OLLAMA_RETRIES         = int(os.getenv("OLLAMA_RETRIES", "3"))            # 재시도 횟수
-OLLAMA_BACKOFF         = float(os.getenv("OLLAMA_BACKOFF", "2.0"))        # 지수 백오프 배수
-OLLAMA_NUM_PREDICT     = int(os.getenv("OLLAMA_NUM_PREDICT", "400"))      # 출력 토큰 상한
-OLLAMA_NUM_CTX         = int(os.getenv("OLLAMA_NUM_CTX", "4096"))         # 컨텍스트 크기
+OLLAMA_CONNECT_TIMEOUT = int(os.getenv("OLLAMA_CONNECT_TIMEOUT", "60"))
+OLLAMA_READ_TIMEOUT    = int(os.getenv("OLLAMA_READ_TIMEOUT", "600"))
+OLLAMA_RETRIES         = int(os.getenv("OLLAMA_RETRIES", "3"))
+OLLAMA_BACKOFF         = float(os.getenv("OLLAMA_BACKOFF", "2.0"))
+OLLAMA_NUM_PREDICT     = int(os.getenv("OLLAMA_NUM_PREDICT", "400"))
+OLLAMA_NUM_CTX         = int(os.getenv("OLLAMA_NUM_CTX", "4096"))
 
-# 폴백 단계에서 더 공격적으로 줄일 값
 FALLBACK_NUM_PREDICT   = int(os.getenv("FALLBACK_NUM_PREDICT", "250"))
 FALLBACK_CTX           = int(os.getenv("FALLBACK_CTX", "3072"))
-FALLBACK_READ_TIMEOUT  = int(os.getenv("FALLBACK_READ_TIMEOUT", "240"))    # 2차 시도 읽기 타임아웃
-HARD_INPUT_LIMIT       = int(os.getenv("HARD_INPUT_LIMIT", "2200"))        # 1차 입력 컷
-FALLBACK_INPUT_LIMIT   = int(os.getenv("FALLBACK_INPUT_LIMIT", "1200"))    # 2차 입력 컷(더 짧게)
+FALLBACK_READ_TIMEOUT  = int(os.getenv("FALLBACK_READ_TIMEOUT", "240"))
+HARD_INPUT_LIMIT       = int(os.getenv("HARD_INPUT_LIMIT", "2200"))
+FALLBACK_INPUT_LIMIT   = int(os.getenv("FALLBACK_INPUT_LIMIT", "1200"))
 
-# ===== 모델 I/O 스키마 =====
+IGNORE_IMAGES_DEFAULT  = os.getenv("IGNORE_IMAGES_DEFAULT", "0") in ("1", "true", "True")
+CAPTION_ENABLED        = os.getenv("CAPTION_ENABLED", "1") in ("1", "true", "True")
+HANDLER_TIMEOUT_SECS   = int(os.getenv("HANDLER_TIMEOUT_SECS", "180"))
+
 class ImageInput(BaseModel):
     url: Optional[str] = None
     base64: Optional[str] = None
@@ -38,7 +48,6 @@ class SummarizeRequest(BaseModel):
     images: List[ImageInput] = Field(default_factory=list)
     meta: Dict[str, Any] = Field(default_factory=dict)
 
-# 내부 사용: 5개 항목
 class ComplaintFields(BaseModel):
     위치: str = ""
     현상: str = ""
@@ -48,7 +57,6 @@ class ComplaintFields(BaseModel):
 
 _JSON_KEYS = ["위치", "현상", "문제점", "위험성", "요청사항"]
 
-# ===== 공통 유틸 (주석 최소) =====
 def _post_json_with_retry(url, headers=None, payload=None, timeout=None, retries=None, backoff=None):
     if timeout is None:
         timeout = (OLLAMA_CONNECT_TIMEOUT, OLLAMA_READ_TIMEOUT)
@@ -111,26 +119,20 @@ def _postprocess(s: str, keep_sentences: int = 1, max_chars: int = 200) -> str:
         s += "."
     return s
 
-# ======================================================================
-# 🧠 (A) 텍스트 인식/전처리 핵심 로직 — 매우 자세한 설명 주석
-# ======================================================================
+# ----------------------------- (AI가 "글"을 읽기 위한 전처리) -----------------------------
 def _cap_input(t: str, limit=HARD_INPUT_LIMIT) -> str:
     """
-    [텍스트 인식(입력 전처리) — LLM 컨텍스트 보호 + 의미 단위 유지]
+    [텍스트 전처리/인식 — LLM 컨텍스트 최적화]
 
-    왜 필요한가?
-    - 민원 본문이 길어질수록 LLM은 앞부분 문맥을 선호하고, 전체 길이가 컨텍스트 한계를 넘으면
-      중요한 정보를 놓치거나 응답이 불안정해질 수 있습니다.
-    - 단순 문자 수 자르기는 문장 중간을 끊어 의미 손실을 유발합니다.
+    목적:
+    - 긴 민원 텍스트를 문장 경계 기준으로 안전하게 축약하여, 모델의 컨텍스트 한도 내에서
+      핵심 정보를 보존합니다. 단순 문자 수 기반 절단의 의미 손실을 줄입니다.
 
-    무엇을 하는가?
-    1) _normalize()로 불필요한 공백/대괄호 주석 등을 제거해 토큰 낭비를 줄입니다.
-    2) 전체 길이가 limit 이하이면 그대로 반환 → 불필요한 재분절 방지로 속도/품질 유지.
-    3) 초과하면 _sent_split()으로 "문장 단위"로 분리하여 앞에서부터 누적해 limit 직전까지 포함.
-       - 이렇게 하면 문맥 경계(문장)를 보존하면서 "정보 밀도 높은 앞부분"을 우선 공급합니다.
-
-    결과:
-    - LLM이 읽기 좋은 "문장 경계 기반 요약 입력"을 생성 → 추출 정확도/일관성↑, 타임아웃↓
+    핵심 아이디어:
+    1) _normalize(): 불필요 공백·대괄호 주석 제거 → 토큰 낭비 최소화.
+    2) 길이가 제한 이하이면 원문 유지 → 불필요한 재분절 방지로 속도/품질 유지.
+    3) 초과 시 _sent_split()으로 문장 단위 분절 → 앞에서부터 누적하여 limit 직전까지 구성.
+       이렇게 하면 문맥 경계를 보존하면서 모델이 선호하는 전방(앞부분) 정보가 온전히 전달됩니다.
     """
     t = _normalize(t)
     if len(t) <= limit:
@@ -145,30 +147,27 @@ def _cap_input(t: str, limit=HARD_INPUT_LIMIT) -> str:
         total += n
     return " ".join(out)
 
-# ======================================================================
-# 🖼️ (B) 이미지 인식 파이프라인 — 매우 자세한 설명 주석
-# ======================================================================
+# ----------------------------- (AI가 "사진"을 읽기 위한 파이프라인) -----------------------------
 def _load_image(image_item: ImageInput):
     """
-    [이미지 로딩(저수준) — URL/base64 → PIL.Image(RGB)]
+    [이미지 로딩/인식(저수준) — URL/base64 → PIL.Image(RGB)]
 
-    입력 형식:
-      - image_item.url: http(s) 이미지 경로(S3/CDN/정적 서버 등)
-      - image_item.base64: 'data:image/png;base64,...' 또는 순수 base64 페이로드
+    입력:
+      - image_item.url: http(s) 경로(S3/CDN/정적 서버 등)
+      - image_item.base64: 'data:image/png;base64,...' 또는 순수 base64
 
     설계 원칙:
       1) 모든 이미지를 RGB 3채널로 통일(convert('RGB')):
-         - 다양한 포맷(P, LA, RGBA 등)로 인한 전처리/모델 호환 문제 예방.
-      2) 네트워크/디코딩 실패가 전체 요청 실패로 번지는 것을 차단:
-         - 각 이미지별 예외는 여기서 흡수하고 None 반환 → 상위에서 해당 이미지만 skip.
-      3) 보안/안정성:
-         - 외부 URL은 타임아웃(기본 10~20초)을 걸어 비정상 응답에 빠르게 탈출.
-         - base64는 data URL 헤더 제거 후 디코드, 손상 시 예외 → None.
+         - 다양한 컬러모드(P, LA, RGBA 등)로 인한 전처리/모델 호환 문제 예방.
+      2) 외부 URL은 네트워크 타임아웃을 강제:
+         - 느린/비정상 응답에 오래 묶이지 않도록 빠르게 탈출.
+      3) 개별 이미지 실패는 여기서 흡수하여 None 반환:
+         - 상위 파이프라인을 멈추지 않고 해당 이미지만 건너뜀.
 
     처리 흐름:
-      (a) URL이 있으면 requests.get(url, timeout=20) → BytesIO → PIL.Image.open → RGB 변환
-      (b) base64가 있으면 data 헤더 제거 → base64.b64decode → BytesIO → PIL → RGB
-      (c) 둘 다 실패/없으면 None 반환
+      (a) URL: requests.get → BytesIO → PIL.Image.open → RGB
+      (b) base64: data URL 헤더 제거 → base64.b64decode → BytesIO → PIL → RGB
+      (c) 둘 다 없거나 실패 시 None
     """
     try:
         io = importlib.import_module("io")
@@ -181,13 +180,11 @@ def _load_image(image_item: ImageInput):
         if image_item.base64:
             b64 = image_item.base64
             if b64.startswith("data:"):
-                # 'data:image/png;base64,AAAA...' 접두 제거
                 b64 = b64.split(",", 1)[-1]
             base64_mod = importlib.import_module("base64")
             raw = base64_mod.b64decode(b64)
             return PIL.open(io.BytesIO(raw)).convert("RGB")
     except Exception:
-        # 개별 이미지 실패는 전체 파이프라인을 멈추지 않음
         return None
     return None
 
@@ -211,7 +208,6 @@ def _device():
     return _state["device"]
 
 def _ensure_caption():
-    # BLIP 캡셔닝 모델/프로세서 1회 로드(캐시)
     if _state["cap_model"] is not None:
         return True
     try:
@@ -227,21 +223,20 @@ def _ensure_caption():
 
 def _blip_caption(pil_image) -> str:
     """
-    [시맨틱 캡셔닝(고수준) — BLIP로 '이미지 → 영어 문장' 생성]
+    [이미지 의미 인식/설명 — BLIP 캡셔닝]
 
     목적:
-      - 사진의 핵심 객체/상황을 한두 문장 영어로 설명 → 이후 한국어 번역/텍스트 결합에 사용.
-      - 본문 텍스트가 빈약해도 이미지가 '증거 신호' 역할을 하여 추출 정확도 보강.
+    - 사진의 핵심 사물·상황을 한두 문장으로 기술하여 텍스트 신호를 보강합니다.
+      본문이 빈약해도 이미지로부터 위치/현상에 관한 힌트를 확보할 수 있습니다.
 
-    핵심 단계:
-      1) _ensure_caption()으로 Processor/Model을 1회 로드(메모리 캐시).
-      2) Processor로 전처리 텐서 생성(proc(images=..., return_tensors="pt")).
-      3) torch.no_grad() 하에서 model.generate 실행 (max_new_tokens=40로 장문/헛소리 억제).
-      4) proc.decode(..., skip_special_tokens=True)로 텍스트화 → 깔끔한 영어 캡션.
+    과정:
+    1) _ensure_caption()으로 Processor/Model 1회 로드(캐시).
+    2) Processor로 전처리 텐서 생성(proc(images=..., return_tensors="pt")).
+    3) torch.no_grad()에서 model.generate(max_new_tokens=40)로 과도한 장문/환각 억제.
+    4) decode(skip_special_tokens=True)로 깔끔한 영어 문장 획득.
 
-    성능/안정성:
-      - GPU 있으면 크게 가속, 없으면 CPU로도 동작(느릴 수 있으므로 이미지 수를 제한).
-      - 예외 발생 시 빈 문자열 반환하여 전체 요청은 계속 진행.
+    성능:
+    - GPU 사용 시 크게 가속, CPU 환경에서는 이미지 수를 제한하여 지연을 관리합니다.
     """
     if not _ensure_caption():
         return ""
@@ -257,7 +252,6 @@ def _blip_caption(pil_image) -> str:
         return ""
 
 def _ensure_translator():
-    # MarianMT EN→KO 번역 모델 1회 로드(캐시)
     if _state["translator_ready"]:
         return True
     try:
@@ -273,19 +267,18 @@ def _ensure_translator():
 
 def _translate_en2ko(text: str) -> str:
     """
-    [캡션 번역 — 영어 → 한국어]
+    [이미지 설명 번역 — 영어→한국어]
 
-    왜 번역하는가?
-      - 최종 요약/추출 프롬프트는 한국어 중심으로 설계되어 있으며,
-        모델이 한 언어로 일관된 문맥을 볼수록 정확도가 올라갑니다.
+    목적:
+    - 캡션을 한국어 문맥으로 맞춰 LLM 입력 일관성을 높입니다. 혼용 언어로 인한 정보 손실을 줄입니다.
 
-    어떻게 하는가?
-      1) MarianMT(EN→KO)를 준비(최초 1회 로드 후 캐시).
-      2) 토큰화 → generate(num_beams=4, max_length=192)로 안정성 확보.
-      3) special tokens 제거 후 한국어 캡션 반환.
+    과정:
+    1) MarianMT EN→KO 준비(캐시).
+    2) 토큰화 후 generate(num_beams=4, max_length=192)로 안정성 확보.
+    3) special tokens 제거 후 자연스러운 한국어 문장 반환.
 
-    실패 시:
-      - 번역 모델 미사용/오류면 원문(영어) 그대로 반환 → 파이프라인 지속.
+    실패:
+    - 번역 리소스 불가 시 원문(영어) 유지하여 파이프라인을 끊지 않습니다.
     """
     t = (text or "").strip()
     if not t:
@@ -304,21 +297,22 @@ def _translate_en2ko(text: str) -> str:
 
 def _get_captions(images: List[ImageInput]) -> List[str]:
     """
-    [이미지 파이프라인 오케스트레이션 — 다장 처리/번역/정제]
+    [이미지 인식 파이프라인 — 로딩→의미추출→한국어화]
 
     입력:
       - ImageInput 리스트(URL/base64 혼재 가능)
 
-    동작:
-      1) _load_image()로 각 항목을 안전하게 PIL.Image(RGB)로 변환(실패 시 해당 이미지만 skip).
-      2) _blip_caption()으로 영어 캡션 생성.
-      3) _translate_en2ko()로 한국어로 번역(번역 모델이 불가하면 영어 유지).
-      4) 공백이 아닌 결과만 축적.
+    흐름:
+      1) _load_image()로 각 이미지를 안전하게 PIL.Image(RGB)로 변환(실패 시 해당 이미지만 건너뜀).
+      2) _blip_caption()으로 영어 설명을 생성.
+      3) _translate_en2ko()로 한국어로 일관화.
+      4) 공백이 아닌 결과만 누적. CPU 환경 지연을 줄이기 위해 최대 3장까지만 처리.
 
-    성능 팁:
-      - CPU 환경에서는 이미지 수가 많을수록 지연↑. 필요 시 상한(예: 3장)으로 제한.
-        아래 구현은 과도한 지연 방지를 위해 최대 3장만 사용합니다.
+    효과:
+      - 사진 근거 신호를 텍스트로 변환해 위치/현상 인식 정확도를 보강합니다.
     """
+    if not CAPTION_ENABLED:
+        return []
     caps = []
     for it in images[:3]:
         img = _load_image(it)
@@ -332,16 +326,14 @@ def _get_captions(images: List[ImageInput]) -> List[str]:
 
 def _compose_input(complaint_text: str, captions: List[str]) -> str:
     """
-    [텍스트+이미지 결합 — 단일 컨텍스트로 통합]
+    [텍스트+이미지 결합 — 단일 문맥으로 통합]
 
     목적:
-      - LLM 추론은 하나의 긴 컨텍스트에서 상호 보완 신호를 볼 때 가장 안정적입니다.
-      - 본문 텍스트에 '사진 설명:' 블록을 덧붙여 동일 문맥으로 제공하면,
-        누락된 위치/현상 정보가 보강되어 구조화 추출 정확도가 올라갑니다.
+    - LLM은 하나의 연속된 컨텍스트에서 상호 보완 신호를 볼 때 안정적으로 추출합니다.
+      본문 뒤에 '사진 설명:' 블록을 덧붙여 동일 문맥으로 제공해 누락 정보를 보강합니다.
 
     규칙:
-      - 본문을 먼저 두고, 이어서 '사진 설명: <캡션1> <캡션2> ...' 형태로 공백 구분 결합.
-      - 상대적으로 단순한 규칙(줄바꿈/마크다운 최소화)으로 모델 혼란을 줄입니다.
+    - 본문을 먼저 두고 '사진 설명: <캡션1> <캡션2> ...' 형태로 간결하게 결합합니다.
     """
     parts = []
     if complaint_text.strip():
@@ -350,9 +342,8 @@ def _compose_input(complaint_text: str, captions: List[str]) -> str:
         parts.append("사진 설명: " + " ".join(captions))
     return " ".join(parts).strip() or "내용 없음"
 
-# ======================================================================
-# (C) 구조화 추출 — 단일 LLM 호출 + 단계적 폴백
-# ======================================================================
+# ----------------------------- (이하 일반 로직: 주석 최소) -----------------------------
+
 def _extract_json_object(text: str) -> Optional[dict]:
     if not text:
         return None
@@ -386,10 +377,6 @@ def _ollama_structured_once(content: str,
                             read_timeout: int,
                             num_ctx: int,
                             num_predict: int) -> Optional[ComplaintFields]:
-    """
-    단일 모델로 한 번 시도.
-    chat + format=json 사용, 미지원/에러 시 generate로 폴백.
-    """
     system_msg = (
         "너는 한국어 민원 분석기다. 입력(민원 내용+사진 설명)에서 "
         "위치, 현상, 문제점, 위험성, 요청사항 5가지를 간결히 채워라. "
@@ -402,7 +389,6 @@ def _ollama_structured_once(content: str,
         f"{content}\n"
         "----"
     )
-
     payload_chat = {
         "model": model,
         "messages": [
@@ -418,7 +404,6 @@ def _ollama_structured_once(content: str,
         "format": "json",
         "stream": False,
     }
-
     try:
         r = _post_json_with_retry(
             f"{OLLAMA_BASE.rstrip('/')}/api/chat",
@@ -447,7 +432,6 @@ def _ollama_structured_once(content: str,
             out[k] = v
         return ComplaintFields(**out)
     except Exception:
-        # chat+format이 미지원/오류일 수 있으니 generate로 한 번 더 시도
         try:
             prompt = (
                 "너는 한국어 민원 분석기다. 입력(민원 내용+사진 설명)에서 "
@@ -494,46 +478,58 @@ def _ollama_structured_once(content: str,
         except Exception:
             return None
 
-def _ollama_structured_with_fallback(joined: str) -> ComplaintFields:
-    """
-    단계적 폴백:
-    1) 주 모델 + 넉넉한 설정
-    2) 실패/지연 시 경량 모델 + 더 짧은 입력/출력/타임아웃
-    3) 그래도 실패면 휴리스틱 즉시 반환
-    """
-    # 1차: 주 모델, 넉넉한 입력
-    t0 = time.time()
-    fields = _ollama_structured_once(
-        content=joined,
-        model=OLLAMA_MODEL,
-        read_timeout=OLLAMA_READ_TIMEOUT,
-        num_ctx=OLLAMA_NUM_CTX,
-        num_predict=OLLAMA_NUM_PREDICT,
-    )
-    if fields:
-        print(f"[summarize] primary model success in {time.time()-t0:.1f}s")
-        return fields
+# ---------------------- 데드라인 인지 폴백 로직 (핵심 패치) ----------------------
+def _remaining(deadline: Optional[float]) -> float:
+    return max(0.0, deadline - time.time()) if deadline else 1e9
 
-    # 2차: 경량 모델, 더 짧은 입력/출력/타임아웃(빠르게 끝내기)
-    print("[summarize] primary failed/timeout -> trying ALT model (fast lane)")
-    # 입력 더 줄이기(이미지 무시 + 텍스트 컷은 상위에서 처리)
+def _ollama_structured_with_fallback(joined: str, deadline: Optional[float] = None) -> ComplaintFields:
+    def eff_read_timeout(rem: float) -> int:
+        hard_cap = max(5, int(rem) - 2)
+        return max(5, min(OLLAMA_READ_TIMEOUT, hard_cap))
+
+    def eff_num_predict(rem: float) -> int:
+        return FALLBACK_NUM_PREDICT if rem < 45 else OLLAMA_NUM_PREDICT
+
+    rem = _remaining(deadline)
+    if rem < 8:
+        return _heuristic_extract_fields(joined)
+
+    device = _device()
+    try_primary = (device == "cuda" and rem >= 45)
+
+    t0 = time.time()
+
+    if try_primary:
+        fields = _ollama_structured_once(
+            content=joined,
+            model=OLLAMA_MODEL,
+            read_timeout=eff_read_timeout(rem),
+            num_ctx=OLLAMA_NUM_CTX,
+            num_predict=eff_num_predict(rem),
+        )
+        if fields:
+            print(f"[summarize] primary model success in {time.time()-t0:.1f}s")
+            return fields
+
+    rem = _remaining(deadline)
+    if rem < 8:
+        return _heuristic_extract_fields(joined)
+
     fast_joined = _cap_input(joined, FALLBACK_INPUT_LIMIT)
     fields = _ollama_structured_once(
         content=fast_joined,
         model=OLLAMA_ALT_MODEL,
-        read_timeout=FALLBACK_READ_TIMEOUT,
-        num_ctx=FALLBACK_CTX,
-        num_predict=FALLBACK_NUM_PREDICT,
+        read_timeout=eff_read_timeout(rem),
+        num_ctx=min(FALLBACK_CTX, OLLAMA_NUM_CTX),
+        num_predict=min(FALLBACK_NUM_PREDICT, eff_num_predict(rem)),
     )
     if fields:
         print(f"[summarize] alt model success in {time.time()-t0:.1f}s")
         return fields
 
-    # 3차: 휴리스틱 즉시
     print("[summarize] all LLM attempts failed -> fallback to heuristic")
     return _heuristic_extract_fields(joined)
 
-# 휴리스틱 백업(LLM 불가 시)
 _ADDR_PAT = re.compile(r"(?:[가-힣A-Za-z0-9]+(?:시|군|구|읍|면|동|리)|[가-힣A-Za-z0-9]+(?:로|길)\s?\d*(?:-\d+)?)")
 _REQ_PAT  = re.compile(r"(조치|정비|수리|보수|교체|정리|단속|처리|확인)\S*|해\s*주세요|요청|바랍니다")
 _RISK_PAT = re.compile(r"(위험|사고|미끄|감전|화재|추락|파손 심함|야간\s*어두움?)")
@@ -574,7 +570,6 @@ def _format_bullets(fields: ComplaintFields) -> str:
     ]
     return "\n".join(lines)
 
-# ===== 파이프라인 결합 =====
 def _json_to_request(data: dict) -> SummarizeRequest:
     if not isinstance(data, dict):
         return SummarizeRequest()
@@ -595,15 +590,17 @@ def _json_to_request(data: dict) -> SummarizeRequest:
         meta = {}
     return SummarizeRequest(complaint_text=ct, images=norm_imgs, meta=meta)
 
-def _run(req: SummarizeRequest) -> ComplaintFields:
-    # 사용자가 meta.ignore_images를 켜면 이미지 무시(속도 우선)
-    use_images = not bool(req.meta.get("ignore_images"))
+def _run(req: SummarizeRequest, deadline: Optional[float] = None) -> ComplaintFields:
+    use_images = not bool(req.meta.get("ignore_images", IGNORE_IMAGES_DEFAULT))
     captions = _get_captions(req.images) if (req.images and use_images) else []
     clean_text = _ko_cleanup_noise(_cap_input(req.complaint_text, HARD_INPUT_LIMIT))
     joined = _compose_input(clean_text, captions)
 
+    if _remaining(deadline) < 8:
+        return _heuristic_extract_fields(joined)
+
     if _ollama_available():
-        fields = _ollama_structured_with_fallback(joined)
+        fields = _ollama_structured_with_fallback(joined, deadline=deadline)
     else:
         fields = _heuristic_extract_fields(joined)
 
@@ -611,7 +608,6 @@ def _run(req: SummarizeRequest) -> ComplaintFields:
         fields = _heuristic_extract_fields(joined)
     return fields
 
-# ===== 응답 유틸 =====
 def _wants_json(request: Request, req_meta: Dict[str, Any]) -> bool:
     if request.query_params.get("format", "").lower() == "json":
         return True
@@ -641,40 +637,59 @@ def _fields_to_dict(fields: ComplaintFields, lang: str = "ko") -> dict:
             "요청사항": fields.요청사항 or "",
         }
 
-# ===== 라우팅 =====
-@app.get("/healthcheck")
+@app.get("/health")
 def healthcheck():
     return {"ok": True}
 
 @app.post("/summarize")
-async def summarize(request: Request, complaint_text: Optional[str] = Form(None), images: List[UploadFile] = File(None)):
+async def summarize(request: Request):
     try:
         ct_header = (request.headers.get("content-type") or "").lower()
+        ignore_q = (request.query_params.get("ignore_images") or "").lower() in ("1", "true")
+
         if "application/json" in ct_header:
             data = await request.json()
             req = _json_to_request(data if isinstance(data, dict) else {})
-        else:
+            if ignore_q:
+                req.meta["ignore_images"] = True
+
+        elif "multipart/form-data" in ct_header:
+            form = await request.form()
+            complaint_text = (form.get("complaint_text") or "").strip()
+            want_images = CAPTION_ENABLED and not (ignore_q or IGNORE_IMAGES_DEFAULT)
             img_inputs: List[ImageInput] = []
-            if images:
-                for f in images:
+            if want_images:
+                for f in form.getlist("images"):
                     try:
-                        data = await f.read()
-                        mime = f.content_type or "image/jpeg"
-                        b64 = base64.b64encode(data).decode("utf-8")
-                        img_inputs.append(ImageInput(base64=f"data:{mime};base64,{b64}"))
+                        if hasattr(f, "read"):
+                            data = await f.read()
+                            mime = getattr(f, "content_type", None) or "image/jpeg"
+                            b64 = base64.b64encode(data).decode("utf-8")
+                            img_inputs.append(ImageInput(base64=f"data:{mime};base64,{b64}"))
                     except Exception:
                         continue
-            req = SummarizeRequest(complaint_text=(complaint_text or "").strip(), images=img_inputs)
+            req = SummarizeRequest(
+                complaint_text=complaint_text,
+                images=img_inputs,
+                meta={"ignore_images": not want_images or ignore_q}
+            )
+
+        else:
+            raw = await request.body()
+            req = SummarizeRequest(complaint_text=raw.decode("utf-8", "ignore"), images=[], meta={})
+            if ignore_q:
+                req.meta["ignore_images"] = True
+
+        deadline = time.time() + max(5, HANDLER_TIMEOUT_SECS - 1)
 
         t0 = time.time()
-        fields = _run(req)
+        with fail_after(HANDLER_TIMEOUT_SECS):
+            fields = await anyio.to_thread.run_sync(_run, req, deadline)
         elapsed = time.time() - t0
         print(f"[summarize] elapsed={elapsed:.1f}s")
 
         wants_json = _wants_json(request, req.meta)
-        lang_key = (request.query_params.get("keys")
-                    or (req.meta or {}).get("keys")
-                    or "ko")
+        lang_key = (request.query_params.get("keys") or (req.meta or {}).get("keys") or "ko")
 
         if wants_json:
             return _fields_to_dict(fields, lang_key)
@@ -682,6 +697,8 @@ async def summarize(request: Request, complaint_text: Optional[str] = Form(None)
             bullets = _format_bullets(fields)
             return PlainTextResponse(bullets)
 
+    except AnyioTimeoutError:
+        raise HTTPException(status_code=504, detail="server-timeout: summarize exceeded handler deadline")
     except HTTPException:
         raise
     except Exception as e:
@@ -694,4 +711,4 @@ if __name__ == "__main__":
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     reload_flag = os.getenv("RELOAD", "0") in ("1", "true", "True")
-    uvicorn.run("app.main:app", host=host, port=port, reload=reload_flag)
+    uvicorn.run(app, host=host, port=port, reload=reload_flag)

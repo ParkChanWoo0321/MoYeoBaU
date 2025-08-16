@@ -232,8 +232,10 @@ public class ComplaintService {
         List<String> httpUrls = refs.stream().filter(u -> u.startsWith("http://") || u.startsWith("https://")).toList();
         List<String> local = refs.stream().filter(u -> !(u.startsWith("http://") || u.startsWith("https://"))).toList();
 
+        Mono<SummarizerClient.FieldsResponse> aiCall;
+
         if (!local.isEmpty()) {
-            return Mono.fromCallable(() -> {
+            aiCall = Mono.fromCallable(() -> {
                         List<byte[]> bytes = new ArrayList<>();
                         for (String p : local) {
                             try {
@@ -243,23 +245,18 @@ public class ComplaintService {
                         return bytes;
                     })
                     .subscribeOn(Schedulers.boundedElastic())
-                    .flatMap(images -> summarizerClient.summarizeFieldsMultipart(text, images))
-                    .map(res -> {
-                        String bullets = toBullets(res);
-                        c.setSummary(bullets);
-                        complaintRepository.save(c);
-                        return bullets;
-                    });
+                    .flatMap(images -> summarizerClient.summarizeFieldsMultipart(text, images));
+        } else {
+            aiCall = summarizerClient.summarizeFieldsJson(text, httpUrls);
         }
 
-        return summarizerClient.summarizeFieldsJson(text, httpUrls)
-                .publishOn(Schedulers.boundedElastic())
-                .map(res -> {
+        return aiCall.flatMap(res -> Mono.fromCallable(() -> {
                     String bullets = toBullets(res);
                     c.setSummary(bullets);
                     complaintRepository.save(c);
                     return bullets;
-                });
+                }).subscribeOn(Schedulers.boundedElastic())
+        );
     }
 
     private static String toBullets(SummarizerClient.FieldsResponse res) {

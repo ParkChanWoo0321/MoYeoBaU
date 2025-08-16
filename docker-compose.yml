@@ -1,0 +1,56 @@
+services:
+  ai:
+    build:
+      context: ./ai_service
+      dockerfile: Dockerfile
+    container_name: seosan-ai
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: .          # <- 현재 루트가 스프링부트
+      dockerfile: Dockerfile
+    container_name: seosan-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      AI_BASE: http://ai:8000
+      # 로컬 PC MySQL 쓰면 ↓ 로 바꿔서 mysql 서비스 제거
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/seosancomplain?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 1234
+    depends_on:
+      ai:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    container_name: seosan-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: seosancomplain
+      TZ: Asia/Seoul
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p1234"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+volumes:
+  mysql_data:
