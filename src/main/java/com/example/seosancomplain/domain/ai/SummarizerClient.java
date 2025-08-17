@@ -25,7 +25,7 @@ public class SummarizerClient {
     @Value("${ai.summarizer.endpoint:/summarize}")
     private String endpoint;
 
-    @Value("${ai.client.timeout-ms:120000}") // 👈 최종 가드 (클라이언트 레벨)
+    @Value("${ai.client.timeout-ms:120000}")
     private long clientTimeoutMs;
 
     public Mono<FieldsResponse> summarizeFieldsJson(String text, List<String> imageUrls) {
@@ -38,10 +38,9 @@ public class SummarizerClient {
         }
         Map<String, Object> meta = new HashMap<>();
         meta.put("response", "json");
-        meta.put("keys", "en"); // 🔹영문 키 요청
+        meta.put("keys", "en");
         req.setMeta(meta);
 
-        // baseUrl은 WebClientConfig에서 설정되어 있으므로 절대URL이 아닌 path만 사용
         return webClient.post()
                 .uri(uriBuilder -> uriBuilder
                         .path(endpoint)
@@ -55,7 +54,7 @@ public class SummarizerClient {
                 .onStatus(HttpStatusCode::isError,
                         resp -> resp.createException().flatMap(Mono::error))
                 .bodyToMono(FieldsResponse.class)
-                .timeout(Duration.ofMillis(clientTimeoutMs)); // 👈 최종 가드
+                .timeout(Duration.ofMillis(clientTimeoutMs));
     }
 
     public Mono<FieldsResponse> summarizeFieldsMultipart(String text, List<byte[]> imageBytesList) {
@@ -87,7 +86,7 @@ public class SummarizerClient {
                 .onStatus(HttpStatusCode::isError,
                         resp -> resp.createException().flatMap(Mono::error))
                 .bodyToMono(FieldsResponse.class)
-                .timeout(Duration.ofMillis(clientTimeoutMs)); // 👈 최종 가드
+                .timeout(Duration.ofMillis(clientTimeoutMs));
     }
 
     @Data

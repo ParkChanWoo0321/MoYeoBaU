@@ -28,4 +28,9 @@ public class ComplaintResponseDto {
     private String rejectionDetail;
     private List<AdminCommentDto> comments;
     private Integer commentCount;
+    private String summaryLocation;
+    private String summaryPhenomenon;
+    private String summaryProblem;
+    private String summaryRisk;
+    private String summaryRequest;
 }

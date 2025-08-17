@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 @Configuration
 public class WebClientConfig {
 
-    @Value("${ai.summarizer.base-url:http://127.0.0.1:8000}")
+    @Value("${ai.base-url:${AI_BASE_URL:http://ai:8000}}")
     String baseUrl;
 
     @Value("${ai.timeout.connect-ms:999999999}")
@@ -32,8 +32,8 @@ public class WebClientConfig {
     @Value("${ai.timeout.write-secs:999999999}")
     int writeTimeoutSecs;
 
-    @Value("${spring.codec.max-in-memory-size-bytes:16777216}")
-    int maxInMemoryBytes;
+    @Value("${spring.codec.max-in-memory-size:16MB}")
+    String maxInMemorySize;
 
     @Bean
     public WebClient webClient() {
@@ -45,13 +45,31 @@ public class WebClientConfig {
                         .addHandlerLast(new WriteTimeoutHandler(writeTimeoutSecs, TimeUnit.SECONDS))
                 );
 
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(c -> {
+                    int bytes;
+                    try {
+                        String v = maxInMemorySize.trim().toUpperCase();
+                        if (v.endsWith("MB")) {
+                            bytes = Integer.parseInt(v.replace("MB", "").trim()) * 1024 * 1024;
+                        } else if (v.endsWith("KB")) {
+                            bytes = Integer.parseInt(v.replace("KB", "").trim()) * 1024;
+                        } else if (v.endsWith("B")) {
+                            bytes = Integer.parseInt(v.replace("B", "").trim());
+                        } else {
+                            bytes = Integer.parseInt(v);
+                        }
+                    } catch (Exception e) {
+                        bytes = 16 * 1024 * 1024;
+                    }
+                    c.defaultCodecs().maxInMemorySize(bytes);
+                })
+                .build();
+
         return WebClient.builder()
                 .baseUrl(baseUrl)
-
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .exchangeStrategies(ExchangeStrategies.builder()
-                        .codecs(c -> c.defaultCodecs().maxInMemorySize(maxInMemoryBytes))
-                        .build())
+                .exchangeStrategies(strategies)
                 .build();
     }
 }

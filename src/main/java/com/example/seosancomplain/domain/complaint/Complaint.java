@@ -46,7 +46,7 @@ public class Complaint {
 
     @Setter
     @Getter
-    @Column(name = "summary", length = 600)
+    @Column(columnDefinition = "TEXT")
     private String summary;
 
     @PrePersist

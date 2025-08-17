@@ -16,6 +16,8 @@ import com.example.seosancomplain.dto.ComplaintRequestDto;
 import com.example.seosancomplain.dto.ComplaintResponseDto;
 import com.example.seosancomplain.exception.CustomException;
 import com.example.seosancomplain.exception.ErrorCode;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -40,6 +42,7 @@ public class ComplaintService {
     private final SummarizerClient summarizerClient;
     private final AdminCommentRepository adminCommentRepository;
     private final AttachmentRepository attachmentRepository;
+    private final ObjectMapper objectMapper;
 
     public ComplaintResponseDto createComplaint(ComplaintRequestDto dto) {
         if (dto.getTitle() == null || dto.getTitle().isBlank())
@@ -199,6 +202,7 @@ public class ComplaintService {
     }
 
     private ComplaintResponseDto toDto(Complaint c) {
+        Map<String, String> fields = parseSummary(c.getSummary());
         return ComplaintResponseDto.builder()
                 .id(c.getId())
                 .title(c.getTitle())
@@ -213,6 +217,11 @@ public class ComplaintService {
                 .updatedAt(c.getUpdatedAt() != null ? c.getUpdatedAt().toString() : null)
                 .rejectionReason(c.getRejectionReason() != null ? c.getRejectionReason().name() : null)
                 .rejectionDetail(c.getRejectionDetail())
+                .summaryLocation(fields.getOrDefault("location", ""))
+                .summaryPhenomenon(fields.getOrDefault("phenomenon", ""))
+                .summaryProblem(fields.getOrDefault("problem", ""))
+                .summaryRisk(fields.getOrDefault("risk", ""))
+                .summaryRequest(fields.getOrDefault("request", ""))
                 .build();
     }
 
@@ -251,25 +260,18 @@ public class ComplaintService {
         }
 
         return aiCall.flatMap(res -> Mono.fromCallable(() -> {
-                    String bullets = toBullets(res);
-                    c.setSummary(bullets);
+                    Map<String, String> map = new LinkedHashMap<>();
+                    map.put("location", res.getLocation() == null ? "" : res.getLocation());
+                    map.put("phenomenon", res.getPhenomenon() == null ? "" : res.getPhenomenon());
+                    map.put("problem", res.getProblem() == null ? "" : res.getProblem());
+                    map.put("risk", res.getRisk() == null ? "" : res.getRisk());
+                    map.put("request", res.getRequest() == null ? "" : res.getRequest());
+                    String json = objectMapper.writeValueAsString(map);
+                    c.setSummary(json);
                     complaintRepository.save(c);
-                    return bullets;
+                    return json;
                 }).subscribeOn(Schedulers.boundedElastic())
         );
-    }
-
-    private static String toBullets(SummarizerClient.FieldsResponse res) {
-        String l = res.getLocation() == null ? "" : res.getLocation();
-        String p1 = res.getPhenomenon() == null ? "" : res.getPhenomenon();
-        String p2 = res.getProblem() == null ? "" : res.getProblem();
-        String r = res.getRisk() == null ? "" : res.getRisk();
-        String rq = res.getRequest() == null ? "" : res.getRequest();
-        return "• Location: " + l + "\n"
-                + "• Phenomenon: " + p1 + "\n"
-                + "• Problem: " + p2 + "\n"
-                + "• Risk: " + r + "\n"
-                + "• Request: " + rq;
     }
 
     public ComplaintDetailDto getComplaintDetail(Long id) {
@@ -581,5 +583,27 @@ public class ComplaintService {
 
     public Page<ComplaintResponseDto> getTopCategoryPendingAsUnified(Pageable pageable) {
         return getTopCategoryPendingComplaints(pageable).map(this::toDto);
+    }
+
+    private Map<String, String> parseSummary(String summaryJson) {
+        if (summaryJson == null || summaryJson.isBlank()) return emptyFields();
+        try {
+            Map<String, String> m = objectMapper.readValue(summaryJson, new TypeReference<>() {
+            });
+            emptyFields().forEach(m::putIfAbsent);
+            return m;
+        } catch (Exception e) {
+            return emptyFields();
+        }
+    }
+
+    private Map<String, String> emptyFields() {
+        Map<String, String> m = new HashMap<>();
+        m.put("location", "");
+        m.put("phenomenon", "");
+        m.put("problem", "");
+        m.put("risk", "");
+        m.put("request", "");
+        return m;
     }
 }

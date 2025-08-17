@@ -13,10 +13,11 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+      start_period: 20s
 
   backend:
     build:
-      context: .          # <- 현재 루트가 스프링부트
+      context: .
       dockerfile: Dockerfile
     container_name: seosan-backend
     ports:
@@ -24,8 +25,7 @@ services:
     env_file:
       - .env
     environment:
-      AI_BASE: http://ai:8000
-      # 로컬 PC MySQL 쓰면 ↓ 로 바꿔서 mysql 서비스 제거
+      AI_BASE_URL: http://ai:8000
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/seosancomplain?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: 1234
