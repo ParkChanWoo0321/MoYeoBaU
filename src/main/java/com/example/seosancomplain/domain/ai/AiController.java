@@ -1,5 +1,6 @@
 package com.example.seosancomplain.domain.ai;
 
+import com.example.seosancomplain.domain.ai.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +24,16 @@ public class AiController {
         int k = req.maxSentences == null ? 3 : req.maxSentences;
         String summary = ai.summarize(req.text, k);
         return Map.of("summary", summary);
+    }
+
+    @PostMapping("/prepare")
+    public ComplaintFields prepare(@RequestBody SummarizeRequest body) {
+        return ai.prepare(body);
+    }
+
+    @PostMapping("/compose")
+    public ComposeOut compose(@RequestBody ComposeIn body) {
+        return ai.compose(body);
     }
 
     public record SummarizeReq(String text, Integer maxSentences) {}

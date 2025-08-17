@@ -1,5 +1,6 @@
 package com.example.seosancomplain.domain.ai;
 
+import com.example.seosancomplain.domain.ai.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +20,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AiClient {
 
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(120);
 
     private final WebClient webClient;
     @Autowired
@@ -83,5 +84,26 @@ public class AiClient {
                                 .map(msg -> new IllegalStateException("AI HTTP " + r.statusCode().value() + ": " + msg)))
                 .bodyToMono(type)
                 .block(timeout);
+    }
+
+    /* -------------------- 민원 전용 API ----------------------*/
+    /** 필드 추출: POST /ai/minwon/prepare  */
+    public ComplaintFields prepare(SummarizeRequest req) {
+        return postJson(
+                "/ai/minwon/prepare",
+                req,
+                new ParameterizedTypeReference<ComplaintFields>() {},
+                DEFAULT_TIMEOUT
+        );
+    }
+
+    /** 문서화(제목/본문/HTML 생성): POST /ai/minwon/compose */
+    public ComposeOut compose(ComposeIn req) {
+        return postJson(
+                "/ai/minwon/compose",
+                req,
+                new ParameterizedTypeReference<ComposeOut>() {},
+                DEFAULT_TIMEOUT
+        );
     }
 }
