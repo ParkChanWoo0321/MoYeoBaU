@@ -1,5 +1,7 @@
 package com.example.seosancomplain.domain.ai;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,46 +23,44 @@ import java.util.*;
 public class SummarizerClient {
 
     private final WebClient webClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${ai.summarizer.endpoint:/summarize}")
     private String endpoint;
 
-    @Value("${ai.client.timeout-ms:120000}")
+    @Value("${ai.timeout.response-ms:120000}")
     private long clientTimeoutMs;
 
     public Mono<FieldsResponse> summarizeFieldsJson(String text, List<String> imageUrls) {
         SummarizeRequest req = new SummarizeRequest();
         req.setComplaint_text(text == null ? "" : text);
-        if (imageUrls != null) {
-            for (String url : imageUrls) {
-                req.getImages().add(new ImageInput(url, null));
-            }
-        }
+        if (imageUrls != null) imageUrls.forEach(url -> req.getImages().add(new ImageInput(url, null)));
         Map<String, Object> meta = new HashMap<>();
         meta.put("response", "json");
-        meta.put("keys", "en");
+        meta.put("keys", "ko");
         req.setMeta(meta);
 
         return webClient.post()
-                .uri(uriBuilder -> uriBuilder
-                        .path(endpoint)
-                        .queryParam("format", "json")
-                        .queryParam("keys", "en")
-                        .build())
+                .uri(endpoint)
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .bodyValue(req)
                 .retrieve()
-                .onStatus(HttpStatusCode::isError,
-                        resp -> resp.createException().flatMap(Mono::error))
-                .bodyToMono(FieldsResponse.class)
-                .timeout(Duration.ofMillis(clientTimeoutMs));
+                .onStatus(HttpStatusCode::isError, resp -> resp.createException().flatMap(Mono::error))
+                .bodyToMono(String.class)
+                .timeout(Duration.ofMillis(clientTimeoutMs))
+                .map(raw -> {
+                    try {
+                        return objectMapper.readValue(raw, FieldsResponse.class);
+                    } catch (Exception e) {
+                        throw new RuntimeException("AI 응답 파싱 실패: " + raw, e);
+                    }
+                });
     }
 
     public Mono<FieldsResponse> summarizeFieldsMultipart(String text, List<byte[]> imageBytesList) {
         MultipartBodyBuilder mb = new MultipartBodyBuilder();
         mb.part("complaint_text", text == null ? "" : text);
-
         if (imageBytesList != null) {
             int idx = 0;
             for (byte[] bytes : imageBytesList) {
@@ -74,19 +74,21 @@ public class SummarizerClient {
         }
 
         return webClient.post()
-                .uri(uriBuilder -> uriBuilder
-                        .path(endpoint)
-                        .queryParam("format", "json")
-                        .queryParam("keys", "en")
-                        .build())
+                .uri(endpoint)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(BodyInserters.fromMultipartData(mb.build()))
                 .retrieve()
-                .onStatus(HttpStatusCode::isError,
-                        resp -> resp.createException().flatMap(Mono::error))
-                .bodyToMono(FieldsResponse.class)
-                .timeout(Duration.ofMillis(clientTimeoutMs));
+                .onStatus(HttpStatusCode::isError, resp -> resp.createException().flatMap(Mono::error))
+                .bodyToMono(String.class)
+                .timeout(Duration.ofMillis(clientTimeoutMs))
+                .map(raw -> {
+                    try {
+                        return objectMapper.readValue(raw, FieldsResponse.class);
+                    } catch (Exception e) {
+                        throw new RuntimeException("AI 응답 파싱 실패: " + raw, e);
+                    }
+                });
     }
 
     @Data
@@ -106,10 +108,15 @@ public class SummarizerClient {
 
     @Data
     public static class FieldsResponse {
+        @JsonAlias({"location","위치"})
         private String location;
+        @JsonAlias({"phenomenon","현상"})
         private String phenomenon;
+        @JsonAlias({"problem","문제점"})
         private String problem;
+        @JsonAlias({"risk","위험성"})
         private String risk;
+        @JsonAlias({"request","요청사항"})
         private String request;
     }
 }

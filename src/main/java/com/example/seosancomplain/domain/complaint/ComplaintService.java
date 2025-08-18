@@ -18,17 +18,21 @@ import com.example.seosancomplain.exception.CustomException;
 import com.example.seosancomplain.exception.ErrorCode;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -36,13 +40,17 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ComplaintService {
 
     private final ComplaintRepository complaintRepository;
-    private final SummarizerClient summarizerClient;
     private final AdminCommentRepository adminCommentRepository;
     private final AttachmentRepository attachmentRepository;
     private final ObjectMapper objectMapper;
+    private final SummarizerClient summarizerClient;
+
+    @Value("${ai.timeout.response-ms:300000}")
+    private long aiTimeoutMs;
 
     public ComplaintResponseDto createComplaint(ComplaintRequestDto dto) {
         if (dto.getTitle() == null || dto.getTitle().isBlank())
@@ -210,7 +218,7 @@ public class ComplaintService {
                 .address(c.getAddress())
                 .category(c.getCategory() != null ? c.getCategory().name() : null)
                 .status(c.getStatus() != null ? c.getStatus().name() : null)
-                .imageUrls(buildImageUrlsFor(c))
+                .imageUrls(buildHttpImageUrlsFor(c))
                 .userName(c.getUserName())
                 .phoneNumber(formatPhone(c.getPhoneNumber()))
                 .createdAt(c.getCreatedAt() != null ? c.getCreatedAt().toString() : null)
@@ -225,59 +233,10 @@ public class ComplaintService {
                 .build();
     }
 
-    @Transactional
-    public Mono<String> summarizeAndSave(Long complaintId) {
-        Complaint c = complaintRepository.findById(complaintId)
-                .orElseThrow(() -> new IllegalArgumentException("Complaint not found: " + complaintId));
-
-        if (c.getSummary() != null && !c.getSummary().isBlank())
-            return Mono.just(c.getSummary());
-
-        String text = c.getContent();
-        if (text == null || text.isBlank())
-            return Mono.error(new IllegalStateException("민원 내용이 비어있습니다."));
-
-        List<String> refs = buildImageUrlsFor(c);
-        List<String> httpUrls = refs.stream().filter(u -> u.startsWith("http://") || u.startsWith("https://")).toList();
-        List<String> local = refs.stream().filter(u -> !(u.startsWith("http://") || u.startsWith("https://"))).toList();
-
-        Mono<SummarizerClient.FieldsResponse> aiCall;
-
-        if (!local.isEmpty()) {
-            aiCall = Mono.fromCallable(() -> {
-                        List<byte[]> bytes = new ArrayList<>();
-                        for (String p : local) {
-                            try {
-                                bytes.add(java.nio.file.Files.readAllBytes(java.nio.file.Path.of(p)));
-                            } catch (Exception ignored) {}
-                        }
-                        return bytes;
-                    })
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .flatMap(images -> summarizerClient.summarizeFieldsMultipart(text, images));
-        } else {
-            aiCall = summarizerClient.summarizeFieldsJson(text, httpUrls);
-        }
-
-        return aiCall.flatMap(res -> Mono.fromCallable(() -> {
-                    Map<String, String> map = new LinkedHashMap<>();
-                    map.put("location", res.getLocation() == null ? "" : res.getLocation());
-                    map.put("phenomenon", res.getPhenomenon() == null ? "" : res.getPhenomenon());
-                    map.put("problem", res.getProblem() == null ? "" : res.getProblem());
-                    map.put("risk", res.getRisk() == null ? "" : res.getRisk());
-                    map.put("request", res.getRequest() == null ? "" : res.getRequest());
-                    String json = objectMapper.writeValueAsString(map);
-                    c.setSummary(json);
-                    complaintRepository.save(c);
-                    return json;
-                }).subscribeOn(Schedulers.boundedElastic())
-        );
-    }
-
     public ComplaintDetailDto getComplaintDetail(Long id) {
         Complaint c = complaintRepository.findByIdAndStatus(id, ComplaintStatus.PENDING)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "미처리 민원만 조회할 수 있습니다."));
-        List<String> imgs = buildImageUrlsFor(c);
+        List<String> imgs = buildHttpImageUrlsFor(c);
         List<AdminCommentDto> comments = adminCommentRepository.findByComplaintIdOrderByCreatedAtAsc(c.getId())
                 .stream()
                 .map(cm -> AdminCommentDto.builder()
@@ -311,14 +270,15 @@ public class ComplaintService {
         return list;
     }
 
-    private List<String> buildImageUrlsFor(Complaint c) {
+    private List<String> buildHttpImageUrlsFor(Complaint c) {
         LinkedHashSet<String> set = new LinkedHashSet<>();
         var atts = attachmentRepository.findByComplaintIdOrderByUploadedAtAsc(c.getId());
         for (var att : atts) {
-            String u = (att.getUrl() != null && !att.getUrl().isBlank()) ? att.getUrl() : att.getFilePath();
-            if (u != null && !u.isBlank()) set.add(u);
+            String u = att.getUrl();
+            if (u != null && !u.isBlank() && (u.startsWith("http://") || u.startsWith("https://"))) set.add(u);
         }
-        if (c.getImageUrl() != null && !c.getImageUrl().isBlank()) set.add(c.getImageUrl());
+        String cover = c.getImageUrl();
+        if (cover != null && !cover.isBlank() && (cover.startsWith("http://") || cover.startsWith("https://"))) set.add(cover);
         return new ArrayList<>(set);
     }
 
@@ -510,9 +470,8 @@ public class ComplaintService {
         long prevTotal = complaintRepository.countByCreatedAtBetween(prevFrom, curFrom);
         long prevDone = complaintRepository.countByStatusAndCreatedAtBetween(ComplaintStatus.COMPLETED, prevFrom, curFrom);
 
-        double curRate = (curTotal == 0) ? 0.0 : round1(curDone * 100.0 / curTotal);
-        double prevRate = (prevTotal == 0) ? 0.0 : round1(prevDone * 100.0 / prevTotal);
-
+        double curRate = round1(curTotal == 0 ? 0.0 : (curDone * 100.0 / curTotal));
+        double prevRate = round1(prevTotal == 0 ? 0.0 : (prevDone * 100.0 / prevTotal));
         double delta = round1(curRate - prevRate);
         boolean up = delta > 0;
 
@@ -588,8 +547,7 @@ public class ComplaintService {
     private Map<String, String> parseSummary(String summaryJson) {
         if (summaryJson == null || summaryJson.isBlank()) return emptyFields();
         try {
-            Map<String, String> m = objectMapper.readValue(summaryJson, new TypeReference<>() {
-            });
+            Map<String, String> m = objectMapper.readValue(summaryJson, new TypeReference<>() {});
             emptyFields().forEach(m::putIfAbsent);
             return m;
         } catch (Exception e) {
@@ -605,5 +563,77 @@ public class ComplaintService {
         m.put("risk", "");
         m.put("request", "");
         return m;
+    }
+
+    @Transactional
+    public Map<String, String> ensureSummaryFields(Long complaintId) {
+        Complaint c = complaintRepository.findById(complaintId)
+                .orElseThrow(() -> new IllegalArgumentException("Complaint not found: " + complaintId));
+
+        String existing = c.getSummary();
+        if (existing != null && !existing.isBlank()) {
+            Map<String, String> parsed = parseSummary(existing);
+            emptyFields().forEach(parsed::putIfAbsent);
+            return parsed;
+        }
+
+        String text = c.getContent() == null ? "" : c.getContent();
+        List<byte[]> imageBytes = fetchImageBytesFromFilePath(c.getId());
+        List<String> imageUrls = imageBytes.isEmpty() ? buildHttpImageUrlsFor(c) : List.of();
+
+        SummarizerClient.FieldsResponse resp;
+        long start = System.currentTimeMillis();
+        try {
+            if (!imageBytes.isEmpty()) {
+                resp = summarizerClient
+                        .summarizeFieldsMultipart(text, imageBytes)
+                        .timeout(Duration.ofMillis(aiTimeoutMs))
+                        .block();
+            } else {
+                resp = summarizerClient
+                        .summarizeFieldsJson(text, imageUrls)
+                        .timeout(Duration.ofMillis(aiTimeoutMs))
+                        .block();
+            }
+        } catch (Exception e) {
+            long took = System.currentTimeMillis() - start;
+            throw new CustomException(ErrorCode.AI_TIMEOUT_OR_ERROR, "AI 요청 실패: " + e.getMessage());
+        }
+
+        Map<String, String> normalized = emptyFields();
+        if (resp != null) {
+            normalized.put("location", Optional.ofNullable(resp.getLocation()).orElse(""));
+            normalized.put("phenomenon", Optional.ofNullable(resp.getPhenomenon()).orElse(""));
+            normalized.put("problem", Optional.ofNullable(resp.getProblem()).orElse(""));
+            normalized.put("risk", Optional.ofNullable(resp.getRisk()).orElse(""));
+            normalized.put("request", Optional.ofNullable(resp.getRequest()).orElse(""));
+        }
+
+        try {
+            String json = objectMapper.writeValueAsString(normalized);
+            c.setSummary(json);
+            complaintRepository.save(c);
+        } catch (Exception e) {
+            throw new RuntimeException("요약 저장 실패", e);
+        }
+
+        return normalized;
+    }
+
+    private List<byte[]> fetchImageBytesFromFilePath(Long complaintId) {
+        List<byte[]> out = new ArrayList<>();
+        try {
+            var atts = attachmentRepository.findByComplaintIdOrderByUploadedAtAsc(complaintId);
+            for (Attachment a : atts) {
+                String path = a.getFilePath();
+                if (path == null || path.isBlank()) continue;
+                Path p = Paths.get(path);
+                if (Files.exists(p) && Files.isRegularFile(p)) {
+                    out.add(Files.readAllBytes(p));
+                    if (out.size() >= 5) break;
+                }
+            }
+        } catch (Exception ignored) {}
+        return out;
     }
 }

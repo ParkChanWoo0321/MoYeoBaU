@@ -23,9 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -126,10 +124,18 @@ public class AdminController {
 
     // AI 요약
     @PostMapping("/complaints/{id}/ai-summary")
-    public Mono<ResponseEntity<Map<String, String>>> summarizeComplaint(@PathVariable Long id) {
-        return complaintService.summarizeAndSave(id)
-                .map(sum -> ResponseEntity.ok(Map.of("summary", sum)));
+    public SummaryDto upsertAndGetSummary(@PathVariable Long id) {
+        Map<String,String> f = complaintService.ensureSummaryFields(id); // 없으면 생성·저장, 있으면 그대로
+        return new SummaryDto(
+                f.getOrDefault("location",""),
+                f.getOrDefault("phenomenon",""),
+                f.getOrDefault("problem",""),
+                f.getOrDefault("risk",""),
+                f.getOrDefault("request","")
+        );
     }
+
+    public record SummaryDto(String location, String phenomenon, String problem, String risk, String request) {}
 
     // 상세(내용/이미지/댓글)
     @GetMapping("/complaints/{id}")

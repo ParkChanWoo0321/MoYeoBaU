@@ -9,7 +9,8 @@ services:
     env_file:
       - .env
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # python:3.11-slim에는 curl/wget 없음 → 파이썬 내장으로 헬스체크
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -25,10 +26,15 @@ services:
     env_file:
       - .env
     environment:
-      AI_BASE_URL: http://ai:8000
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/seosancomplain?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: 1234
+      # 핵심: 도커 프로필 강제
+      SPRING_PROFILES_ACTIVE: docker
+
+      # (선택) 환경변수로도 덮어쓸 수 있지만, 프로필 파일에 이미 있으므로 굳이 필요 없음
+      # SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/seosancomplain?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      # SPRING_DATASOURCE_USERNAME: root
+      # SPRING_DATASOURCE_PASSWORD: 1234
+      # AI_BASE_URL: http://ai:8000
+
     depends_on:
       ai:
         condition: service_healthy

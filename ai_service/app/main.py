@@ -6,7 +6,6 @@ import os, re, base64, importlib, requests, time, json
 import anyio
 from anyio import fail_after
 
-# anyio v3/v4 호환
 try:
     from anyio import TimeoutError as AnyioTimeoutError
 except Exception:
@@ -119,21 +118,7 @@ def _postprocess(s: str, keep_sentences: int = 1, max_chars: int = 200) -> str:
         s += "."
     return s
 
-# ----------------------------- (AI가 "글"을 읽기 위한 전처리) -----------------------------
 def _cap_input(t: str, limit=HARD_INPUT_LIMIT) -> str:
-    """
-    [텍스트 전처리/인식 — LLM 컨텍스트 최적화]
-
-    목적:
-    - 긴 민원 텍스트를 문장 경계 기준으로 안전하게 축약하여, 모델의 컨텍스트 한도 내에서
-      핵심 정보를 보존합니다. 단순 문자 수 기반 절단의 의미 손실을 줄입니다.
-
-    핵심 아이디어:
-    1) _normalize(): 불필요 공백·대괄호 주석 제거 → 토큰 낭비 최소화.
-    2) 길이가 제한 이하이면 원문 유지 → 불필요한 재분절 방지로 속도/품질 유지.
-    3) 초과 시 _sent_split()으로 문장 단위 분절 → 앞에서부터 누적하여 limit 직전까지 구성.
-       이렇게 하면 문맥 경계를 보존하면서 모델이 선호하는 전방(앞부분) 정보가 온전히 전달됩니다.
-    """
     t = _normalize(t)
     if len(t) <= limit:
         return t
@@ -147,28 +132,7 @@ def _cap_input(t: str, limit=HARD_INPUT_LIMIT) -> str:
         total += n
     return " ".join(out)
 
-# ----------------------------- (AI가 "사진"을 읽기 위한 파이프라인) -----------------------------
 def _load_image(image_item: ImageInput):
-    """
-    [이미지 로딩/인식(저수준) — URL/base64 → PIL.Image(RGB)]
-
-    입력:
-      - image_item.url: http(s) 경로(S3/CDN/정적 서버 등)
-      - image_item.base64: 'data:image/png;base64,...' 또는 순수 base64
-
-    설계 원칙:
-      1) 모든 이미지를 RGB 3채널로 통일(convert('RGB')):
-         - 다양한 컬러모드(P, LA, RGBA 등)로 인한 전처리/모델 호환 문제 예방.
-      2) 외부 URL은 네트워크 타임아웃을 강제:
-         - 느린/비정상 응답에 오래 묶이지 않도록 빠르게 탈출.
-      3) 개별 이미지 실패는 여기서 흡수하여 None 반환:
-         - 상위 파이프라인을 멈추지 않고 해당 이미지만 건너뜀.
-
-    처리 흐름:
-      (a) URL: requests.get → BytesIO → PIL.Image.open → RGB
-      (b) base64: data URL 헤더 제거 → base64.b64decode → BytesIO → PIL → RGB
-      (c) 둘 다 없거나 실패 시 None
-    """
     try:
         io = importlib.import_module("io")
         PIL = importlib.import_module("PIL.Image")
@@ -222,22 +186,6 @@ def _ensure_caption():
         return False
 
 def _blip_caption(pil_image) -> str:
-    """
-    [이미지 의미 인식/설명 — BLIP 캡셔닝]
-
-    목적:
-    - 사진의 핵심 사물·상황을 한두 문장으로 기술하여 텍스트 신호를 보강합니다.
-      본문이 빈약해도 이미지로부터 위치/현상에 관한 힌트를 확보할 수 있습니다.
-
-    과정:
-    1) _ensure_caption()으로 Processor/Model 1회 로드(캐시).
-    2) Processor로 전처리 텐서 생성(proc(images=..., return_tensors="pt")).
-    3) torch.no_grad()에서 model.generate(max_new_tokens=40)로 과도한 장문/환각 억제.
-    4) decode(skip_special_tokens=True)로 깔끔한 영어 문장 획득.
-
-    성능:
-    - GPU 사용 시 크게 가속, CPU 환경에서는 이미지 수를 제한하여 지연을 관리합니다.
-    """
     if not _ensure_caption():
         return ""
     try:
@@ -266,20 +214,6 @@ def _ensure_translator():
         return False
 
 def _translate_en2ko(text: str) -> str:
-    """
-    [이미지 설명 번역 — 영어→한국어]
-
-    목적:
-    - 캡션을 한국어 문맥으로 맞춰 LLM 입력 일관성을 높입니다. 혼용 언어로 인한 정보 손실을 줄입니다.
-
-    과정:
-    1) MarianMT EN→KO 준비(캐시).
-    2) 토큰화 후 generate(num_beams=4, max_length=192)로 안정성 확보.
-    3) special tokens 제거 후 자연스러운 한국어 문장 반환.
-
-    실패:
-    - 번역 리소스 불가 시 원문(영어) 유지하여 파이프라인을 끊지 않습니다.
-    """
     t = (text or "").strip()
     if not t:
         return ""
@@ -296,21 +230,6 @@ def _translate_en2ko(text: str) -> str:
         return t
 
 def _get_captions(images: List[ImageInput]) -> List[str]:
-    """
-    [이미지 인식 파이프라인 — 로딩→의미추출→한국어화]
-
-    입력:
-      - ImageInput 리스트(URL/base64 혼재 가능)
-
-    흐름:
-      1) _load_image()로 각 이미지를 안전하게 PIL.Image(RGB)로 변환(실패 시 해당 이미지만 건너뜀).
-      2) _blip_caption()으로 영어 설명을 생성.
-      3) _translate_en2ko()로 한국어로 일관화.
-      4) 공백이 아닌 결과만 누적. CPU 환경 지연을 줄이기 위해 최대 3장까지만 처리.
-
-    효과:
-      - 사진 근거 신호를 텍스트로 변환해 위치/현상 인식 정확도를 보강합니다.
-    """
     if not CAPTION_ENABLED:
         return []
     caps = []
@@ -325,24 +244,12 @@ def _get_captions(images: List[ImageInput]) -> List[str]:
     return caps
 
 def _compose_input(complaint_text: str, captions: List[str]) -> str:
-    """
-    [텍스트+이미지 결합 — 단일 문맥으로 통합]
-
-    목적:
-    - LLM은 하나의 연속된 컨텍스트에서 상호 보완 신호를 볼 때 안정적으로 추출합니다.
-      본문 뒤에 '사진 설명:' 블록을 덧붙여 동일 문맥으로 제공해 누락 정보를 보강합니다.
-
-    규칙:
-    - 본문을 먼저 두고 '사진 설명: <캡션1> <캡션2> ...' 형태로 간결하게 결합합니다.
-    """
     parts = []
     if complaint_text.strip():
         parts.append(complaint_text.strip())
     if captions:
         parts.append("사진 설명: " + " ".join(captions))
     return " ".join(parts).strip() or "내용 없음"
-
-# ----------------------------- (이하 일반 로직: 주석 최소) -----------------------------
 
 def _extract_json_object(text: str) -> Optional[dict]:
     if not text:
@@ -372,15 +279,39 @@ def _ollama_available() -> bool:
 def _empty_fields() -> ComplaintFields:
     return ComplaintFields(**{k: "" for k in _JSON_KEYS})
 
+def _enforce_sentence(key: str, val: str) -> str:
+    s = _ko_cleanup_noise(_normalize(val))[:80]
+    if not s:
+        return ""
+    if re.search(r"(다\.|요\.|니다\.|습니다\.|[.!?…])$", s):
+        return s
+    if key == "문제점":
+        return f"{s}이 발생했습니다."
+    if key == "위험성":
+        return f"{s} 위험이 있습니다."
+    if key == "요청사항":
+        return f"{s}이 필요합니다."
+    if key == "위치":
+        return f"{s}에서 발생했습니다."
+    if key == "현상":
+        return f"{s}입니다."
+    return f"{s}입니다."
+
 def _ollama_structured_once(content: str,
                             model: str,
                             read_timeout: int,
                             num_ctx: int,
                             num_predict: int) -> Optional[ComplaintFields]:
     system_msg = (
-        "너는 한국어 민원 분석기다. 입력(민원 내용+사진 설명)에서 "
-        "위치, 현상, 문제점, 위험성, 요청사항 5가지를 간결히 채워라. "
-        "각 값은 0~80자 한국어 문장/구. 모르면 빈 문자열. 출력은 JSON만."
+        "너는 한국어 민원 분석기다. 입력(민원 텍스트와 사진 설명)을 분석해 "
+        "위치, 현상, 문제점, 위험성, 요청사항을 추출한다. 출력은 JSON만 반환한다."
+        "스타일 가이드:\n"
+        "- 각 값은 1문장 이내, 20~80자 권장, 한국어의 자연스러운 종결형 사용(“~합니다/입니다”).\n"
+        "- 불필요한 반복/군더더기 제거(예: ‘위험이 있습니다’를 중복 사용하지 말 것).\n"
+        "- ‘~있음입니다’ 같은 비문 금지. 중복 어휘·어색한 접속어 정리.\n"
+        "- 사진이 있으면 텍스트와 충돌하지 않는 범위에서 시각적 단서 반영.\n"
+        "- 사실 불명확하면 과장하지 말고 일반화하지 말 것. 모르면 빈 문자열.\n"
+        "- 출력은 JSON만, 키는 한국어로 고정: 위치, 현상, 문제점, 위험성, 요청사항.\n"
     )
     user_msg = (
         "아래 내용을 읽고 JSON으로만 응답해.\n"
@@ -428,20 +359,23 @@ def _ollama_structured_once(content: str,
             v = obj.get(k, "")
             if not isinstance(v, str):
                 v = "" if v is None else str(v)
-            v = _ko_cleanup_noise(_normalize(v))[:80]
+            v = _enforce_sentence(k, v)
             out[k] = v
         return ComplaintFields(**out)
     except Exception:
         try:
             prompt = (
-                "너는 한국어 민원 분석기다. 입력(민원 내용+사진 설명)에서 "
-                "위치, 현상, 문제점, 위험성, 요청사항 5가지를 간결히 채워라. "
-                "각 값은 0~80자 한국어 문장/구. 모르면 빈 문자열만 둬라.\n"
-                "출력은 반드시 JSON만. 키는 다음과 같이 고정:\n"
-                '{ "위치": "", "현상": "", "문제점": "", "위험성": "", "요청사항": "" }\n'
-                "-----\n"
+                "다음 입력(민원 텍스트 + 사진 설명)을 읽고 아래 다섯 값을 채워라.\n"
+                "요구사항:\n"
+                "1) 각 값은 1문장, 20~80자, 자연스러운 한국어(‘~합니다/입니다’).\n"
+                "2) 중복·군더더기 금지. ‘위험이 있습니다’는 최대 1회만 사용.\n"
+                "3) 어색한 표현(‘~있음입니다’) 금지. 문장 품사/호응 맞추기.\n"
+                "4) 불확실하면 해당 키는 빈 문자열로 두기.\n"
+                "5) 출력은 반드시 JSON만. 아래 키/형식을 그대로 사용:\n"
+                '{\"위치\":\"\",\"현상\":\"\",\"문제점\":\"\",\"위험성\":\"\",\"요청사항\":\"\"}\n'
+                "----- 입력 시작 -----\n"
                 f"{content}\n"
-                "-----\n"
+                "----- 입력 끝 -----\n"
             )
             payload_gen = {
                 "model": model,
@@ -472,13 +406,12 @@ def _ollama_structured_once(content: str,
                 v = obj.get(k, "")
                 if not isinstance(v, str):
                     v = "" if v is None else str(v)
-                v = _ko_cleanup_noise(_normalize(v))[:80]
+                v = _enforce_sentence(k, v)
                 out[k] = v
             return ComplaintFields(**out)
         except Exception:
             return None
 
-# ---------------------- 데드라인 인지 폴백 로직 (핵심 패치) ----------------------
 def _remaining(deadline: Optional[float]) -> float:
     return max(0.0, deadline - time.time()) if deadline else 1e9
 
@@ -548,13 +481,13 @@ def _heuristic_extract_fields(content: str) -> ComplaintFields:
     위험성 = _find_first(_RISK_PAT, t)
     요청사항 = _find_first(_REQ_PAT, t)
     현상 = first if first else ""
-    def clean(x): return _ko_cleanup_noise(x)[:80]
+    def wrap(k, x): return _enforce_sentence(k, x)
     return ComplaintFields(
-        위치=clean(위치),
-        현상=clean(현상),
-        문제점=clean(문제점),
-        위험성=clean(위험성),
-        요청사항=clean(요청사항),
+        위치=wrap("위치", 위치),
+        현상=wrap("현상", 현상),
+        문제점=wrap("문제점", 문제점),
+        위험성=wrap("위험성", 위험성),
+        요청사항=wrap("요청사항", 요청사항),
     )
 
 def _format_bullets(fields: ComplaintFields) -> str:
@@ -595,15 +528,12 @@ def _run(req: SummarizeRequest, deadline: Optional[float] = None) -> ComplaintFi
     captions = _get_captions(req.images) if (req.images and use_images) else []
     clean_text = _ko_cleanup_noise(_cap_input(req.complaint_text, HARD_INPUT_LIMIT))
     joined = _compose_input(clean_text, captions)
-
     if _remaining(deadline) < 8:
         return _heuristic_extract_fields(joined)
-
     if _ollama_available():
         fields = _ollama_structured_with_fallback(joined, deadline=deadline)
     else:
         fields = _heuristic_extract_fields(joined)
-
     if not any(getattr(fields, k) for k in _JSON_KEYS):
         fields = _heuristic_extract_fields(joined)
     return fields
