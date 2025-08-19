@@ -52,6 +52,10 @@ public class ComplaintService {
     @Value("${ai.timeout.response-ms:300000}")
     private long aiTimeoutMs;
 
+    @Value("${app.public-base-url}")
+    private String publicBaseUrl;
+
+    @Transactional
     public ComplaintResponseDto createComplaint(ComplaintRequestDto dto) {
         if (dto.getTitle() == null || dto.getTitle().isBlank())
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "제목을 입력해 주세요.");
@@ -70,9 +74,7 @@ public class ComplaintService {
         complaintRepository.save(complaint);
 
         if (dto.getImageUrls() != null && !dto.getImageUrls().isEmpty()) {
-            List<Attachment> atts = attachmentRepository.findByUrlIn(dto.getImageUrls());
-            for (Attachment a : atts) a.setComplaint(complaint);
-            attachmentRepository.saveAll(atts);
+            attachImages(complaint, dto.getImageUrls());
         }
         return toDto(complaint);
     }
@@ -86,21 +88,19 @@ public class ComplaintService {
         return toDto(getVerifiedComplaint(id, userName, phoneNumber));
     }
 
+    @Transactional
     public ComplaintResponseDto updateMyComplaint(Long id, ComplaintRequestDto dto) {
         if (dto.getAddress() != null && !SeosanRegion.isValid(dto.getAddress()))
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "지역은 서산시 읍·면·동 중에서 선택해 주세요.");
         Complaint complaint = getVerifiedComplaint(id, dto.getUserName(), dto.getPhoneNumber());
         updateEntity(complaint, dto);
-        complaintRepository.save(complaint);
 
         if (dto.getImageUrls() != null) {
             if (!dto.getImageUrls().isEmpty()) complaint.setImageUrl(dto.getImageUrls().getFirst());
             else complaint.setImageUrl(null);
-            List<Attachment> atts = attachmentRepository.findByUrlIn(dto.getImageUrls());
-            for (Attachment a : atts) a.setComplaint(complaint);
-            attachmentRepository.saveAll(atts);
-            complaintRepository.save(complaint);
+            attachImages(complaint, dto.getImageUrls());
         }
+        complaintRepository.save(complaint);
         return toDto(complaint);
     }
 
@@ -116,6 +116,7 @@ public class ComplaintService {
         return complaintRepository.findAll().stream().map(this::toDto).toList();
     }
 
+    @Transactional
     public ComplaintResponseDto updateComplaint(Long id, ComplaintRequestDto dto) {
         if (dto.getAddress() != null && !SeosanRegion.isValid(dto.getAddress()))
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "지역은 서산시 읍·면·동 중에서 선택해 주세요.");
@@ -126,9 +127,7 @@ public class ComplaintService {
         if (dto.getImageUrls() != null) {
             if (!dto.getImageUrls().isEmpty()) complaint.setImageUrl(dto.getImageUrls().getFirst());
             else complaint.setImageUrl(null);
-            List<Attachment> atts = attachmentRepository.findByUrlIn(dto.getImageUrls());
-            for (Attachment a : atts) a.setComplaint(complaint);
-            attachmentRepository.saveAll(atts);
+            attachImages(complaint, dto.getImageUrls());
         }
         complaintRepository.save(complaint);
         return toDto(complaint);
@@ -137,7 +136,7 @@ public class ComplaintService {
     @Transactional
     public void deleteComplaint(Long id) {
         Complaint c = complaintRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("민원 정보를 찾을 수 없습니다."));
+                .orElseThrow(() -> new RuntimeException("민원을 찾을 수 없습니다."));
         adminCommentRepository.deleteByComplaintId(id);
         attachmentRepository.deleteByComplaintId(id);
         complaintRepository.delete(c);
@@ -145,7 +144,7 @@ public class ComplaintService {
 
     public ComplaintResponseDto updateStatus(Long id, ComplaintStatus status) {
         Complaint c = complaintRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("민원 정보를 찾을 수 없습니다."));
+                .orElseThrow(() -> new RuntimeException("민원을 찾을 수 없습니다."));
         c.setStatus(status);
         if (status == ComplaintStatus.COMPLETED) {
             if (c.getResolvedAt() == null) c.setResolvedAt(LocalDateTime.now());
@@ -218,7 +217,7 @@ public class ComplaintService {
                 .address(c.getAddress())
                 .category(c.getCategory() != null ? c.getCategory().name() : null)
                 .status(c.getStatus() != null ? c.getStatus().name() : null)
-                .imageUrls(buildHttpImageUrlsFor(c))
+                .imageUrls(buildImageUrlsFor(c))
                 .userName(c.getUserName())
                 .phoneNumber(formatPhone(c.getPhoneNumber()))
                 .createdAt(c.getCreatedAt() != null ? c.getCreatedAt().toString() : null)
@@ -236,7 +235,7 @@ public class ComplaintService {
     public ComplaintDetailDto getComplaintDetail(Long id) {
         Complaint c = complaintRepository.findByIdAndStatus(id, ComplaintStatus.PENDING)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "미처리 민원만 조회할 수 있습니다."));
-        List<String> imgs = buildHttpImageUrlsFor(c);
+        List<String> imgs = buildImageUrlsFor(c);
         List<AdminCommentDto> comments = adminCommentRepository.findByComplaintIdOrderByCreatedAtAsc(c.getId())
                 .stream()
                 .map(cm -> AdminCommentDto.builder()
@@ -268,18 +267,6 @@ public class ComplaintService {
             list.add(CategoryCountDto.builder().category(c).count(cnt).build());
         }
         return list;
-    }
-
-    private List<String> buildHttpImageUrlsFor(Complaint c) {
-        LinkedHashSet<String> set = new LinkedHashSet<>();
-        var atts = attachmentRepository.findByComplaintIdOrderByUploadedAtAsc(c.getId());
-        for (var att : atts) {
-            String u = att.getUrl();
-            if (u != null && !u.isBlank() && (u.startsWith("http://") || u.startsWith("https://"))) set.add(u);
-        }
-        String cover = c.getImageUrl();
-        if (cover != null && !cover.isBlank() && (cover.startsWith("http://") || cover.startsWith("https://"))) set.add(cover);
-        return new ArrayList<>(set);
     }
 
     private String formatPhone(String phone) {
@@ -579,10 +566,9 @@ public class ComplaintService {
 
         String text = c.getContent() == null ? "" : c.getContent();
         List<byte[]> imageBytes = fetchImageBytesFromFilePath(c.getId());
-        List<String> imageUrls = imageBytes.isEmpty() ? buildHttpImageUrlsFor(c) : List.of();
+        List<String> imageUrls = imageBytes.isEmpty() ? buildImageUrlsFor(c) : List.of();
 
         SummarizerClient.FieldsResponse resp;
-        long start = System.currentTimeMillis();
         try {
             if (!imageBytes.isEmpty()) {
                 resp = summarizerClient
@@ -596,17 +582,16 @@ public class ComplaintService {
                         .block();
             }
         } catch (Exception e) {
-            long took = System.currentTimeMillis() - start;
             throw new CustomException(ErrorCode.AI_TIMEOUT_OR_ERROR, "AI 요청 실패: " + e.getMessage());
         }
 
         Map<String, String> normalized = emptyFields();
         if (resp != null) {
-            normalized.put("location", Optional.ofNullable(resp.getLocation()).orElse(""));
-            normalized.put("phenomenon", Optional.ofNullable(resp.getPhenomenon()).orElse(""));
-            normalized.put("problem", Optional.ofNullable(resp.getProblem()).orElse(""));
-            normalized.put("risk", Optional.ofNullable(resp.getRisk()).orElse(""));
-            normalized.put("request", Optional.ofNullable(resp.getRequest()).orElse(""));
+            normalized.put("location", tidyKo(Optional.ofNullable(resp.getLocation()).orElse("")));
+            normalized.put("phenomenon", tidyKo(Optional.ofNullable(resp.getPhenomenon()).orElse("")));
+            normalized.put("problem", tidyKo(Optional.ofNullable(resp.getProblem()).orElse("")));
+            normalized.put("risk", tidyKo(Optional.ofNullable(resp.getRisk()).orElse("")));
+            normalized.put("request", tidyRequest(Optional.ofNullable(resp.getRequest()).orElse("")));
         }
 
         try {
@@ -634,6 +619,123 @@ public class ComplaintService {
                 }
             }
         } catch (Exception ignored) {}
+        return out;
+    }
+
+    private String toPublicUrl(String u) {
+        if (u == null || u.isBlank()) return null;
+        if (u.startsWith("http://") || u.startsWith("https://")) return u;
+        if (u.startsWith("/")) return publicBaseUrl + u;
+        return publicBaseUrl + "/" + u;
+    }
+
+    private List<String> buildImageUrlsFor(Complaint c) {
+        LinkedHashSet<String> set = new LinkedHashSet<>();
+        var atts = attachmentRepository.findByComplaintIdOrderByUploadedAtAsc(c.getId());
+        for (var att : atts) {
+            String raw = (att.getUrl() != null && !att.getUrl().isBlank()) ? att.getUrl() : att.getFilePath();
+            String pub = toPublicUrl(raw);
+            if (pub != null) set.add(pub);
+        }
+        String cover = toPublicUrl(c.getImageUrl());
+        if (cover != null) set.add(cover);
+        return new ArrayList<>(set);
+    }
+
+    private void attachImages(Complaint complaint, List<String> urls) {
+        if (urls == null || urls.isEmpty()) return;
+        List<Attachment> existing = attachmentRepository.findByUrlIn(urls);
+        Set<String> existingUrls = existing.stream()
+                .map(Attachment::getUrl)
+                .filter(u -> u != null && !u.isBlank())
+                .collect(Collectors.toSet());
+
+        List<Attachment> toUpdateOwner = new ArrayList<>();
+        for (Attachment a : existing) {
+            if (a.getComplaint() == null || !Objects.equals(a.getComplaint().getId(), complaint.getId())) {
+                a.setComplaint(complaint);
+                toUpdateOwner.add(a);
+            }
+        }
+        if (!toUpdateOwner.isEmpty()) attachmentRepository.saveAll(toUpdateOwner);
+
+        List<Attachment> toCreate = new ArrayList<>();
+        for (String u : urls) {
+            if (u == null || u.isBlank()) continue;
+            if (!existingUrls.contains(u)) {
+                toCreate.add(Attachment.builder()
+                        .url(u)
+                        .complaint(complaint)
+                        .build());
+            }
+        }
+        if (!toCreate.isEmpty()) attachmentRepository.saveAll(toCreate);
+    }
+
+    private static String tidyKo(String s) {
+        if (s == null) return "";
+        String out = s.trim();
+
+        // 기본 정규화
+        out = out.replaceAll("[~˜]+", "");
+        out = out.replaceAll("\\s+", " ");
+        out = out.replaceAll("\\s*,\\s*", ", ");
+        out = out.replaceAll("\\s*\\.", ".");
+        out = out.replaceAll("\\s+,", ",");
+        out = out.replaceAll(",\\s*,", ", ");
+
+        // 비문/오타 교정
+        out = out.replaceAll("문제이 발생했습니다", "문제가 발생했습니다");
+        out = out.replaceAll("발생이 발생했습니다", "발생했습니다");
+        out = out.replaceAll("파여 있음입니다", "파여 있습니다");
+        out = out.replaceAll("들려 있고", "들떠 있고");
+
+        // 구어체 → 문어체
+        out = out.replaceAll("있어요이", "있어요");
+        out = out.replaceAll("있어요\\s*발생했습니다", "있습니다.");
+        out = out.replaceAll("있어요(?![가-힣])", "있습니다");
+        out = out.replaceAll("있음입니다", "있습니다");
+        out = out.replaceAll("있음\\.", "있습니다.");
+
+        // 중복 문구 정리
+        out = out.replaceAll("\\b(발생했습니다)(\\s*발생했습니다)+", "$1");
+        out = out.replaceAll("\\b(위험이 있습니다)(\\s*위험이 있습니다)+", "$1");
+        out = out.replaceAll("(입니다|습니다|해요|에요)\\s*(입니다|습니다)", "$1");
+
+        // 문장 끝에서의 중복·군더더기 제거
+        out = out.replaceAll("(수 있습니다)\\s*위험이 있습니다\\.?$", "$1.");
+        out = out.replaceAll("(수도 있습니다)\\s*위험이 있습니다\\.?$", "$1.");
+        out = out.replaceAll("(위험합니다)\\s*위험이 있습니다\\.?$", "$1.");
+
+        // 마침표 보정
+        if (!out.isEmpty() && !out.matches(".*[.?!]$")) out = out + ".";
+        out = out.replaceAll("\\.(\\s*\\.)+$", ".");
+        return out.trim();
+    }
+
+    private static String tidyRequest(String s) {
+        String out = tidyKo(s);
+
+        // '부탁드립니다이', '요청이 필요합니다' 등 정리
+        out = out.replaceAll("부탁드립니다이", "부탁드립니다");
+        out = out.replaceAll("요청이 필요합니다\\.?$", "요청합니다.");
+
+        // 종결 어구 중복 제거
+        out = out.replaceAll("\\b부탁드립니다\\s*요청합니다\\.?$", "부탁드립니다.");
+        out = out.replaceAll("\\b요청합니다\\s*부탁드립니다\\.?$", "요청합니다.");
+
+        // 두 번 이상 반복된 종결 제거
+        out = out.replaceAll("\\b(부탁드립니다|요청합니다)\\b(\\s*\\1\\b)+\\.?$", "$1.");
+
+        // 여전히 '필요합니다'로 끝나면 요청형으로 통일
+        if (out.matches(".*필요합니다\\.?$")) {
+            out = out.replaceAll("필요합니다\\.?$", "요청합니다.");
+        }
+
+        // 마지막 보정: 반드시 요청형으로 끝나도록
+        if (!out.endsWith("요청합니다.") && !out.endsWith("부탁드립니다.")) {
+            out = out.replaceAll("\\.*$", "") + " 요청합니다.";
+        }
         return out;
     }
 }

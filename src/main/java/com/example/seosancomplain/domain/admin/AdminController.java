@@ -125,7 +125,7 @@ public class AdminController {
     // AI 요약
     @PostMapping("/complaints/{id}/ai-summary")
     public SummaryDto upsertAndGetSummary(@PathVariable Long id) {
-        Map<String,String> f = complaintService.ensureSummaryFields(id); // 없으면 생성·저장, 있으면 그대로
+        Map<String,String> f = complaintService.ensureSummaryFields(id);
         return new SummaryDto(
                 f.getOrDefault("location",""),
                 f.getOrDefault("phenomenon",""),
