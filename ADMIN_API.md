@@ -41,51 +41,16 @@
     "rejectionDetail": null,
     "comments": null,
     "commentCount": null
+    "summaryLocation": "",
+    "summaryPhenomenon": "",
+    "summaryProblem": "",
+    "summaryRisk": "",
+    "summaryRequest": ""
 }
 ```
 
 ---
 
-## 관리자 민원 수정
-
-**PATCH** `/api/admin/complaints/{id}`
-
-**Request Body**
-
-```json
-{
-  "userName": "홍길동",
-  "phoneNumber": "010-1234-5678",
-  "content": "도로에 쓰레기가 치워지지 않아요",
-  "address": "해미면",
-  "category": "ENVIRONMENT_CLEANING",
-  "imageUrl": "http://example.com/test2.jpg"
-}
-```
-
-**200 Response (예시)**
-
-```json
-{
-    "id": 1,
-    "title": "신고합니다",
-    "content": "도로에 쓰레기가 치워지지 않아요",
-    "address": "해미면",
-    "category": "ENVIRONMENT_CLEANING",
-    "status": "REJECTED",
-    "imageUrls": [],
-    "userName": "홍길동",
-    "phoneNumber": "010-1234-5678",
-    "createdAt": "2025-08-15T18:20:32.413387",
-    "updatedAt": "2025-08-15T21:05:55.218355",
-    "rejectionReason": "ALREADY_RESOLVED",
-    "rejectionDetail": null,
-    "comments": null,
-    "commentCount": null
-}
-```
-
----
 
 ## 관리자 민원 삭제
 
@@ -128,6 +93,11 @@
     "rejectionDetail": null,
     "comments": null,
     "commentCount": null
+    "summaryLocation": "",
+    "summaryPhenomenon": "",
+    "summaryProblem": "",
+    "summaryRisk": "",
+    "summaryRequest": ""
 }
 ```
 
@@ -229,6 +199,11 @@
             "rejectionDetail": null,
             "comments": null,
             "commentCount": null
+            "summaryLocation": "",
+            "summaryPhenomenon": "",
+            "summaryProblem": "",
+            "summaryRisk": "",
+            "summaryRequest": ""
         }
     ],
     "totalCount": 1
@@ -265,6 +240,11 @@
     ],
     "rejectionReason": "ALREADY_RESOLVED",
     "rejectionDetail": null
+    "summaryLocation": "",
+    "summaryPhenomenon": "",
+    "summaryProblem": "",
+    "summaryRisk": "",
+    "summaryRequest": ""
 }
 ```
 
@@ -320,6 +300,11 @@
             "rejectionDetail": null,
             "comments": null,
             "commentCount": null
+            "summaryLocation": "",
+            "summaryPhenomenon": "",
+            "summaryProblem": "",
+            "summaryRisk": "",
+            "summaryRequest": ""
         },
         {
             "id": 1,
@@ -337,6 +322,11 @@
             "rejectionDetail": null,
             "comments": null,
             "commentCount": null
+            "summaryLocation": "",
+            "summaryPhenomenon": "",
+            "summaryProblem": "",
+            "summaryRisk": "",
+            "summaryRequest": ""
         }
     ],
     "totalCount": 2
@@ -370,6 +360,11 @@
             "rejectionDetail": null,
             "comments": null,
             "commentCount": null
+            "summaryLocation": "",
+            "summaryPhenomenon": "",
+            "summaryProblem": "",
+            "summaryRisk": "",
+            "summaryRequest": ""
         }
     ],
     "totalCount": 1
