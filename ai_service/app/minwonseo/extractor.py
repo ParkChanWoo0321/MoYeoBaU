@@ -1,8 +1,8 @@
 # app/services/extractor.py
 import os, re, json, requests
 from typing import Dict, Any, List, Optional
-from ..schemas.io import SummarizeRequest   # complaint_text, images[], meta
-from ..schemas.fields import ComplaintFields
+from .io import SummarizeRequest
+from .fields import ComplaintFields
 
 # ===== 설정 (환경변수) =====
 USE_LLM          = os.getenv("EXTRACT_USE_LLM", "1") == "1"     # 기본 ON

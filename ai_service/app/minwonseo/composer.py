@@ -1,6 +1,6 @@
 import os, re, requests, json
 from typing import Dict, Any
-from ..schemas.fields import ComplaintFields
+from .fields import ComplaintFields
 
 # (옵션) Ollama – 기본은 OFF
 USE_LLM_COMPOSE = os.getenv("COMPOSE_USE_LLM", "0") == "1"

@@ -4,12 +4,13 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import os, re, base64, importlib, requests, time, json
 import anyio
+from app.minwonseo.io import ImageInput
 from anyio import fail_after
+from app.minwonseo.fields import ComplaintFields
+from app.minwonseo.io import SummarizeRequest
+from app.minwonseo.compose import ComposeIn, ComposeOut
 from app.minwonseo.composer import compose_document
 from app.minwonseo.extractor import run_extract
-from app.minwonseo.compose import ComposeIn, ComposeOut
-from app.minwonseo.io import SummarizeRequest
-from app.minwonseo.fields import ComplaintFields
 
 try:
     from anyio import TimeoutError as AnyioTimeoutError
@@ -43,22 +44,6 @@ IGNORE_IMAGES_DEFAULT  = os.getenv("IGNORE_IMAGES_DEFAULT", "0") in ("1", "true"
 CAPTION_ENABLED        = os.getenv("CAPTION_ENABLED", "1") in ("1", "true", "True")
 HANDLER_TIMEOUT_SECS   = int(os.getenv("HANDLER_TIMEOUT_SECS", "180"))
 STRICT_NO_HEURISTIC    = os.getenv("STRICT_NO_HEURISTIC", "0") in ("1","true","True")
-
-class ImageInput(BaseModel):
-    url: Optional[str] = None
-    base64: Optional[str] = None
-
-class SummarizeRequest(BaseModel):
-    complaint_text: str = ""
-    images: List[ImageInput] = Field(default_factory=list)
-    meta: Dict[str, Any] = Field(default_factory=dict)
-
-class ComplaintFields(BaseModel):
-    위치: str = ""
-    현상: str = ""
-    문제점: str = ""
-    위험성: str = ""
-    요청사항: str = ""
 
 _JSON_KEYS = ["위치", "현상", "문제점", "위험성", "요청사항"]
 
