@@ -15,7 +15,7 @@ public class ComplaintDetailDto {
     // 상단 카드
     private String title;
     private String content;
-    private ComplaintCategory category;
+    private List<ComplaintCategory> categories;
     private ComplaintStatus status;
 
     // 작성자 영역

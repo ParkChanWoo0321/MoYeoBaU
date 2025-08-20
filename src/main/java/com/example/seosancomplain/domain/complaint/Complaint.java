@@ -3,6 +3,8 @@ package com.example.seosancomplain.domain.complaint;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -26,9 +28,14 @@ public class Complaint {
     @Column(length = 1000)
     private String rejectionDetail;
 
+    @ElementCollection(fetch = FetchType.EAGER) // 조회가 잦다면 EAGER 권장, 성능 이슈시 LAZY로
+    @CollectionTable(
+            name = "complaint_categories",
+            joinColumns = @JoinColumn(name = "complaint_id")
+    )
     @Enumerated(EnumType.STRING)
     @Column(name = "category", length = 64, nullable = false)
-    private ComplaintCategory category;   // 카테고리
+    private Set<ComplaintCategory> categories = new LinkedHashSet<>();  // 카테고리
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 32, nullable = false)
     private ComplaintStatus status;       // 상태

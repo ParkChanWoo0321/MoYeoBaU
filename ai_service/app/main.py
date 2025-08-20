@@ -6,11 +6,10 @@ import os, re, base64, importlib, requests, time, json
 import anyio
 from app.minwonseo.io import ImageInput
 from anyio import fail_after
-from app.minwonseo.fields import ComplaintFields
 from app.minwonseo.io import SummarizeRequest
 from app.minwonseo.compose import ComposeIn, ComposeOut
 from app.minwonseo.composer import compose_document
-from app.minwonseo.extractor import run_extract
+from app.minwonseo.fields import ComplaintFields
 
 try:
     from anyio import TimeoutError as AnyioTimeoutError
@@ -688,11 +687,10 @@ async def summarize(request: Request):
         traceback.print_exc(file=sys.stderr)
         raise HTTPException(status_code=500, detail=f"server-error: {type(e).__name__}: {e}")
 
-
 @app.post("/ai/minwon/extract", response_model=ComplaintFields, tags=["ai-minwon"])
 def api_extract(req: SummarizeRequest):
     try:
-        return run_extract(req)
+        return _run(req)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"extract failed: {e}")
 
@@ -708,9 +706,8 @@ def api_compose(body: ComposeIn):
                 images=body.images or [],
                 meta=body.meta or {},
             )
-            fields = run_extract(req)
+            fields = _run(req)
             meta = body.meta or {}
-
         result = compose_document(fields, meta, include_html=False)
         return ComposeOut(
             title=result.get("title", "민원 신청의 건"),
@@ -719,7 +716,6 @@ def api_compose(body: ComposeIn):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"compose failed: {e}")
-
 
 if __name__ == "__main__":
     import uvicorn

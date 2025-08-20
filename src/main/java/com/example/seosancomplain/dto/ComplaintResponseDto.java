@@ -1,6 +1,7 @@
 package com.example.seosancomplain.dto;
 
 import com.example.seosancomplain.domain.admin.comment.AdminCommentDto;
+import com.example.seosancomplain.domain.complaint.ComplaintCategory;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,7 +18,7 @@ public class ComplaintResponseDto {
     private String title;
     private String content;
     private String address;
-    private String category;
+    private List<ComplaintCategory> categories;
     private String status;
     private List<String> imageUrls;
     private String userName;

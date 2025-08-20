@@ -61,7 +61,7 @@ public class ComplaintService {
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "제목을 입력해 주세요.");
         if (dto.getContent() == null || dto.getContent().isBlank())
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "민원 내용을 입력해 주세요.");
-        if (dto.getCategory() == null)
+        if (dto.getCategories() == null || dto.getCategories().isEmpty())
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "카테고리를 선택해 주세요.");
         if (dto.getAddress() == null || dto.getAddress().isBlank())
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "주소(읍·면·동)를 입력해 주세요.");
@@ -188,18 +188,25 @@ public class ComplaintService {
     private void updateEntity(Complaint complaint, ComplaintRequestDto dto) {
         if (dto.getTitle() != null) complaint.setTitle(dto.getTitle());
         if (dto.getContent() != null) complaint.setContent(dto.getContent());
-        if (dto.getCategory() != null) complaint.setCategory(dto.getCategory());
         if (dto.getAddress() != null) complaint.setAddress(dto.getAddress());
         if (dto.getUserName() != null) complaint.setUserName(dto.getUserName());
         if (dto.getPhoneNumber() != null) complaint.setPhoneNumber(dto.getPhoneNumber());
+        if (dto.getCategories() != null) {
+            LinkedHashSet<ComplaintCategory> cats = new LinkedHashSet<>(dto.getCategories());
+            if (cats.isEmpty()) throw new CustomException(ErrorCode.VALIDATION_FAIL, "카테고리는 최소 1개 이상이어야 합니다.");
+            complaint.getCategories().clear();
+            complaint.getCategories().addAll(cats);
+        }
     }
 
     private Complaint toEntity(ComplaintRequestDto dto) {
+        LinkedHashSet<ComplaintCategory> cats = new LinkedHashSet<>(dto.getCategories() == null ? List.of() : dto.getCategories());
+        if (cats.isEmpty()) throw new CustomException(ErrorCode.VALIDATION_FAIL, "카테고리는 최소 1개 이상이어야 합니다.");
         return Complaint.builder()
                 .title(dto.getTitle())
                 .content(dto.getContent())
                 .address(dto.getAddress())
-                .category(dto.getCategory())
+                .categories(cats)
                 .imageUrl((dto.getImageUrls() != null && !dto.getImageUrls().isEmpty())
                         ? dto.getImageUrls().getFirst() : null)
                 .userName(dto.getUserName())
@@ -215,7 +222,7 @@ public class ComplaintService {
                 .title(c.getTitle())
                 .content(c.getContent())
                 .address(c.getAddress())
-                .category(c.getCategory() != null ? c.getCategory().name() : null)
+                .categories(new ArrayList<>(c.getCategories()))
                 .status(c.getStatus() != null ? c.getStatus().name() : null)
                 .imageUrls(buildImageUrlsFor(c))
                 .userName(c.getUserName())
@@ -248,7 +255,7 @@ public class ComplaintService {
                 .title(c.getTitle())
                 .content(c.getContent())
                 .address(c.getAddress())
-                .category(c.getCategory())
+                .categories(new ArrayList<>(c.getCategories()))
                 .status(c.getStatus())
                 .userName(c.getUserName())
                 .phoneNumber(formatPhone(c.getPhoneNumber()))

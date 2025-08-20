@@ -17,7 +17,7 @@ public class ComplaintRequestDto {
     @NotBlank(message="내용을 입력해 주세요.")
     private String content;
     private String address;
-    private ComplaintCategory category;
+    private List<ComplaintCategory> categories;
     private List<String> imageUrls;
     // 본인확인
     private String userName;
