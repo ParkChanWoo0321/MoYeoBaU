@@ -10,6 +10,8 @@ from app.minwonseo.io import SummarizeRequest
 from app.minwonseo.compose import ComposeIn, ComposeOut
 from app.minwonseo.composer import compose_document
 from app.minwonseo.fields import ComplaintFields
+from fastapi import Form, File, UploadFile
+from fastapi import UploadFile as _UploadFile
 
 try:
     from anyio import TimeoutError as AnyioTimeoutError
@@ -43,8 +45,15 @@ IGNORE_IMAGES_DEFAULT  = os.getenv("IGNORE_IMAGES_DEFAULT", "0") in ("1", "true"
 CAPTION_ENABLED        = os.getenv("CAPTION_ENABLED", "1") in ("1", "true", "True")
 HANDLER_TIMEOUT_SECS   = int(os.getenv("HANDLER_TIMEOUT_SECS", "180"))
 STRICT_NO_HEURISTIC    = os.getenv("STRICT_NO_HEURISTIC", "0") in ("1","true","True")
+_Q_MIN_CHARS = 30
 
 _JSON_KEYS = ["위치", "현상", "문제점", "위험성", "요청사항"]
+
+DEFAULT_META = {
+    "org": "서산시청",
+    "receiver": "서산시청장 귀하",
+    "title_prefix": "[서산시]",
+}
 
 def _post_json_with_retry(url, headers=None, payload=None, timeout=None, retries=None, backoff=None):
     if timeout is None:
@@ -610,6 +619,43 @@ def _fields_to_dict(fields: ComplaintFields, lang: str = "ko") -> dict:
             "요청사항": fields.요청사항 or "",
         }
 
+def _assess_text_quality(text: str) -> Dict[str, Any]:
+    t = _normalize(text)
+    if not t:
+        return {"poor": True, "score": 0, "missing": ["위치","문제점","요청사항"]}
+
+    score, missing = 0, []
+    if len(t) >= _Q_MIN_CHARS: score += 1
+
+    has_addr = bool(_ADDR_PAT.search(t))
+    has_prob = bool(_PROB_PAT.search(t))
+    has_req  = bool(_REQ_PAT.search(t))
+    has_risk = bool(_RISK_PAT.search(t))
+
+    score += int(has_addr) + int(has_prob) + int(has_req)
+
+    if not has_addr: missing.append("위치")
+    if not has_prob: missing.append("문제점")
+    if not has_req:  missing.append("요청사항")
+    if not has_risk: missing.append("위험성")
+
+    has_dup = bool(re.search(r"\b(\S+)\s+\1\b", t))
+    if has_dup: score -= 1
+
+    poor = (score <= 1) or (sum([not has_addr, not has_prob, not has_req]) >= 2)
+    return {"poor": poor, "score": score, "missing": missing}
+
+def _empty_keys(f: ComplaintFields) -> List[str]:
+    return [k for k in _JSON_KEYS if not getattr(f, k)]
+
+def _merge_fields(primary: ComplaintFields, fallback: ComplaintFields) -> ComplaintFields:
+    data = {}
+    for k in _JSON_KEYS:
+        v = getattr(primary, k) or ""
+        data[k] = v.strip() or (getattr(fallback, k) or "")
+    return ComplaintFields(**data)
+
+
 @app.get("/health")
 def healthcheck():
     return {"ok": True}
@@ -697,23 +743,68 @@ def api_extract(req: SummarizeRequest):
 @app.post("/ai/minwon/compose", response_model=ComposeOut, tags=["ai-minwon"])
 def api_compose(body: ComposeIn):
     try:
-        if body.fields:
-            fields = body.fields
-            meta = body.meta or {}
-        else:
+
+
+        meta = {**DEFAULT_META, **(body.meta or {})}
+
+        # 최소 입력 검증: fields / 텍스트 / 이미지 모두 없으면 에러
+        if (not body.fields) and not (body.complaint_text or "") and not (body.images or []):
+            raise HTTPException(status_code=400, detail="complaint_text / images / fields 중 하나는 필요합니다.")
+
+        complaint_text = body.complaint_text or ""
+        images = body.images or []
+
+
+        def _run_once(mode: str = "") -> ComplaintFields:
             req = SummarizeRequest(
-                complaint_text=body.complaint_text or "",
-                images=body.images or [],
-                meta=body.meta or {},
+                complaint_text=complaint_text,
+                images=images,
+                meta={**meta, "ignore_images": False}
             )
-            fields = _run(req)
-            meta = body.meta or {}
+
+            deadline = time.time() + max(5, HANDLER_TIMEOUT_SECS - 1)
+            return _run(req, deadline, mode)
+
+        if body.fields:
+            base = body.fields
+            missing0 = _empty_keys(base)
+            if missing0:
+                f1 = _run_once("llm") if images else _run_once("")
+                merged = _merge_fields(base, f1)
+
+                if _empty_keys(merged):
+                    f2 = _run_once("heuristic")
+                    merged = _merge_fields(merged, f2)
+                fields = merged
+            else:
+                fields = base
+
+        else:
+            q = _assess_text_quality(complaint_text)
+            prefer_llm = bool(images) and q["poor"]  # 사진+부실 → LLM 경로 우선
+            mode0 = "llm" if prefer_llm else ""
+
+            fields = _run_once(mode0)
+
+            # 결과에 빈칸이 있으면 LLM 한 번 더(사진 단서 최대 반영)
+            if _empty_keys(fields) and images:
+                f_llm = _run_once("llm")
+                fields = _merge_fields(fields, f_llm)
+
+            if _empty_keys(fields):
+                f_h = _run_once("heuristic")
+                fields = _merge_fields(fields, f_h)
+
         result = compose_document(fields, meta, include_html=False)
+        title = result.get("title") or f"{meta.get('title_prefix','')} 민원 신청의 건"
         return ComposeOut(
-            title=result.get("title", "민원 신청의 건"),
+            title=title.strip(),
             body=result.get("body", ""),
             fields=fields,
         )
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"compose failed: {e}")
 
