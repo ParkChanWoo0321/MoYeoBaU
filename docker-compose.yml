@@ -1,4 +1,18 @@
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: seosan-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
   ai:
     build:
       context: ./ai_service
@@ -6,10 +20,15 @@ services:
     container_name: seosan-ai
     ports:
       - "8000:8000"
-    env_file:
-      - .env
+    environment:
+      - OLLAMA_BASE=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5:3b-instruct
+      - OLLAMA_ALT_MODEL=qwen2.5:3b-instruct
+      - CAPTION_ENABLED=0
+    depends_on:
+      ollama:
+        condition: service_healthy
     healthcheck:
-      # python:3.11-slim에는 curl/wget 없음 → 파이썬 내장으로 헬스체크
       test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
       interval: 10s
       timeout: 3s
@@ -19,22 +38,11 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile
     container_name: seosan-backend
     ports:
       - "8080:8080"
-    env_file:
-      - .env
     environment:
-      # 핵심: 도커 프로필 강제
       SPRING_PROFILES_ACTIVE: docker
-
-      # (선택) 환경변수로도 덮어쓸 수 있지만, 프로필 파일에 이미 있으므로 굳이 필요 없음
-      # SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/seosancomplain?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-      # SPRING_DATASOURCE_USERNAME: root
-      # SPRING_DATASOURCE_PASSWORD: 1234
-      # AI_BASE_URL: http://ai:8000
-
     depends_on:
       ai:
         condition: service_healthy
@@ -49,7 +57,7 @@ services:
       MYSQL_DATABASE: seosancomplain
       TZ: Asia/Seoul
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -60,3 +68,4 @@ services:
 
 volumes:
   mysql_data:
+  ollama_data:

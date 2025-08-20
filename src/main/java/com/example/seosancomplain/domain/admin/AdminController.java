@@ -9,7 +9,6 @@ import com.example.seosancomplain.domain.admin.dto.AdminReportDto;
 import com.example.seosancomplain.domain.admin.dto.CategoryCountDto;
 import com.example.seosancomplain.domain.complaint.ComplaintCategory;
 import com.example.seosancomplain.domain.complaint.ComplaintService;
-import com.example.seosancomplain.dto.ComplaintRequestDto;
 import com.example.seosancomplain.dto.ComplaintResponseDto;
 import com.example.seosancomplain.dto.*;
 import jakarta.validation.Valid;
@@ -68,13 +67,6 @@ public class AdminController {
             @RequestParam(required = false) Boolean ignoredPendingOnly
     ) {
         return ResponseEntity.ok(complaintService.getPendingCategoryCounts());
-    }
-
-    // 민원 수정
-    @PatchMapping("/complaints/{id}")
-    public ResponseEntity<ComplaintResponseDto> updateComplaint(@PathVariable Long id,
-                                                                @RequestBody ComplaintRequestDto dto) {
-        return ResponseEntity.ok(complaintService.updateComplaint(id, dto));
     }
 
     // 민원 삭제

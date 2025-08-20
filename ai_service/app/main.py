@@ -16,7 +16,7 @@ except Exception:
 
 app = FastAPI(title="Seosan AI Service (Ollama Summarizer)")
 
-OLLAMA_BASE = os.getenv("OLLAMA_BASE", "http://127.0.0.1:11434")
+OLLAMA_BASE = os.getenv("OLLAMA_BASE", "http://ollama:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct")
 OLLAMA_ALT_MODEL = os.getenv("OLLAMA_ALT_MODEL", "qwen2.5:3b-instruct")
 USE_KSS = os.getenv("USE_KSS", "0") in ("1", "true", "True")
@@ -37,6 +37,7 @@ FALLBACK_INPUT_LIMIT   = int(os.getenv("FALLBACK_INPUT_LIMIT", "1200"))
 IGNORE_IMAGES_DEFAULT  = os.getenv("IGNORE_IMAGES_DEFAULT", "0") in ("1", "true", "True")
 CAPTION_ENABLED        = os.getenv("CAPTION_ENABLED", "1") in ("1", "true", "True")
 HANDLER_TIMEOUT_SECS   = int(os.getenv("HANDLER_TIMEOUT_SECS", "180"))
+STRICT_NO_HEURISTIC    = os.getenv("STRICT_NO_HEURISTIC", "0") in ("1","true","True")
 
 class ImageInput(BaseModel):
     url: Optional[str] = None
@@ -271,9 +272,13 @@ def _extract_json_object(text: str) -> Optional[dict]:
 
 def _ollama_available() -> bool:
     try:
-        requests.get(f"{OLLAMA_BASE.rstrip('/')}/api/tags", timeout=2)
-        return True
-    except Exception:
+        t0 = time.time()
+        r = requests.get(f"{OLLAMA_BASE.rstrip('/')}/api/tags", timeout=5)
+        ok = (r.status_code == 200)
+        print(f"[ollama] available={ok} elapsed={time.time()-t0:.1f}s base={OLLAMA_BASE}")
+        return ok
+    except Exception as e:
+        print(f"[ollama] unavailable: {e} base={OLLAMA_BASE}")
         return False
 
 def _empty_fields() -> ComplaintFields:
@@ -296,6 +301,21 @@ def _enforce_sentence(key: str, val: str) -> str:
     if key == "현상":
         return f"{s}입니다."
     return f"{s}입니다."
+
+def _map_keys(obj: dict) -> dict:
+    if not isinstance(obj, dict):
+        return {}
+    m = {
+        "위치":"위치","현상":"현상","문제점":"문제점","위험성":"위험성","요청사항":"요청사항",
+        "location":"위치","phenomenon":"현상","problem":"문제점","risk":"위험성","request":"요청사항",
+        "loc":"위치","issue":"문제점","hazard":"위험성","ask":"요청사항"
+    }
+    out = {}
+    for k, v in obj.items():
+        kk = m.get(str(k).strip())
+        if kk:
+            out[kk] = v
+    return out
 
 def _ollama_structured_once(content: str,
                             model: str,
@@ -326,10 +346,10 @@ def _ollama_structured_once(content: str,
         "3) 문제점은 불편·불안 요소, 위험성은 안전상의 구체적 위험만 기술.\n"
         "4) ‘위험이 있습니다’ 표현은 위험성에서만 최대 1회 사용.\n"
         "5) 어색한 표현(예: ‘있어요이’, ‘발생이 발생했습니다’, ‘있음입니다’, ‘요청이 필요합니다’) 금지.\n"
-        "6) 요청사항은 반드시 ‘요청합니다/부탁드립니다’ 사용.\n"
+        "6) 요청사항은 반드시 ‘요청합니다’ 또는 ‘부탁드립니다’로 끝맺음.\n"
         "7) 불확실하면 빈 문자열. 단, ‘위치’는 반드시 채움(없으면 ‘장소 불명’).\n"
         "8) 출력은 반드시 JSON만. 형식 고정:\n"
-        '{ \"위치\": \"\", \"현상\": \"\", \"문제점\": \"\", \"위험성\": \"\", \"요청사항\": \"\" }\n'
+        '{ "위치": "", "현상": "", "문제점": "", "위험성": "", "요청사항": "" }\n'
         "---- 입력 시작 ----\n"
         f"{content}\n"
         "---- 입력 끝 ----"
@@ -368,6 +388,7 @@ def _ollama_structured_once(content: str,
         obj = _extract_json_object(txt)
         if not isinstance(obj, dict):
             return None
+        obj = _map_keys(obj)
         out = {}
         for k in _JSON_KEYS:
             v = obj.get(k, "")
@@ -390,7 +411,7 @@ def _ollama_structured_once(content: str,
                 "5) 요청사항은 반드시 ‘요청합니다’ 또는 ‘부탁드립니다’로 끝맺음.\n"
                 "6) 불확실하면 빈 문자열로 두되, ‘위치’는 반드시 채움(없으면 ‘장소 불명’).\n"
                 "7) 출력은 반드시 JSON만. 아래 형식을 그대로 사용:\n"
-                '{\"위치\":\"\",\"현상\":\"\",\"문제점\":\"\",\"위험성\":\"\",\"요청사항\":\"\"}\n'
+                '{"위치":"","현상":"","문제점":"","위험성":"","요청사항":""}\n'
                 "----- 입력 시작 -----\n"
                 f"{content}\n"
                 "----- 입력 끝 -----\n"
@@ -419,6 +440,7 @@ def _ollama_structured_once(content: str,
             obj = _extract_json_object(txt)
             if not isinstance(obj, dict):
                 return None
+            obj = _map_keys(obj)
             out = {}
             for k in _JSON_KEYS:
                 v = obj.get(k, "")
@@ -437,19 +459,16 @@ def _ollama_structured_with_fallback(joined: str, deadline: Optional[float] = No
     def eff_read_timeout(rem: float) -> int:
         hard_cap = max(5, int(rem) - 2)
         return max(5, min(OLLAMA_READ_TIMEOUT, hard_cap))
-
     def eff_num_predict(rem: float) -> int:
         return FALLBACK_NUM_PREDICT if rem < 45 else OLLAMA_NUM_PREDICT
-
     rem = _remaining(deadline)
     if rem < 8:
+        if STRICT_NO_HEURISTIC:
+            raise HTTPException(status_code=502, detail="llm-unavailable")
         return _heuristic_extract_fields(joined)
-
     device = _device()
     try_primary = (device == "cuda" and rem >= 45)
-
     t0 = time.time()
-
     if try_primary:
         fields = _ollama_structured_once(
             content=joined,
@@ -461,11 +480,11 @@ def _ollama_structured_with_fallback(joined: str, deadline: Optional[float] = No
         if fields:
             print(f"[summarize] primary model success in {time.time()-t0:.1f}s")
             return fields
-
     rem = _remaining(deadline)
     if rem < 8:
+        if STRICT_NO_HEURISTIC:
+            raise HTTPException(status_code=502, detail="llm-unavailable")
         return _heuristic_extract_fields(joined)
-
     fast_joined = _cap_input(joined, FALLBACK_INPUT_LIMIT)
     fields = _ollama_structured_once(
         content=fast_joined,
@@ -477,8 +496,10 @@ def _ollama_structured_with_fallback(joined: str, deadline: Optional[float] = No
     if fields:
         print(f"[summarize] alt model success in {time.time()-t0:.1f}s")
         return fields
-
-    print("[summarize] all LLM attempts failed -> fallback to heuristic")
+    print("[summarize] all LLM attempts failed")
+    if STRICT_NO_HEURISTIC:
+        raise HTTPException(status_code=502, detail="llm-unavailable")
+    print("[summarize] falling back to heuristic")
     return _heuristic_extract_fields(joined)
 
 _ADDR_PAT = re.compile(r"(?:[가-힣A-Za-z0-9]+(?:시|군|구|읍|면|동|리)|[가-힣A-Za-z0-9]+(?:로|길)\s?\d*(?:-\d+)?)")
@@ -541,16 +562,31 @@ def _json_to_request(data: dict) -> SummarizeRequest:
         meta = {}
     return SummarizeRequest(complaint_text=ct, images=norm_imgs, meta=meta)
 
-def _run(req: SummarizeRequest, deadline: Optional[float] = None) -> ComplaintFields:
+def _run(req: SummarizeRequest, deadline: Optional[float] = None, mode: str = "") -> ComplaintFields:
     use_images = not bool(req.meta.get("ignore_images", IGNORE_IMAGES_DEFAULT))
     captions = _get_captions(req.images) if (req.images and use_images) else []
     clean_text = _ko_cleanup_noise(_cap_input(req.complaint_text, HARD_INPUT_LIMIT))
     joined = _compose_input(clean_text, captions)
+    if mode == "heuristic":
+        if STRICT_NO_HEURISTIC:
+            raise HTTPException(status_code=502, detail="llm-unavailable")
+        return _heuristic_extract_fields(joined)
+    if mode == "llm":
+        if _ollama_available():
+            f = _ollama_structured_with_fallback(joined, deadline=deadline)
+            if not any(getattr(f, k) for k in _JSON_KEYS):
+                raise HTTPException(status_code=502, detail="llm-empty")
+            return f
+        raise HTTPException(status_code=502, detail="ollama-unavailable")
     if _remaining(deadline) < 8:
+        if STRICT_NO_HEURISTIC:
+            raise HTTPException(status_code=502, detail="llm-unavailable")
         return _heuristic_extract_fields(joined)
     if _ollama_available():
         fields = _ollama_structured_with_fallback(joined, deadline=deadline)
     else:
+        if STRICT_NO_HEURISTIC:
+            raise HTTPException(status_code=502, detail="ollama-unavailable")
         fields = _heuristic_extract_fields(joined)
     if not any(getattr(fields, k) for k in _JSON_KEYS):
         fields = _heuristic_extract_fields(joined)
@@ -589,18 +625,32 @@ def _fields_to_dict(fields: ComplaintFields, lang: str = "ko") -> dict:
 def healthcheck():
     return {"ok": True}
 
+@app.post("/summarize_json")
+async def summarize_json(req: SummarizeRequest):
+    text = (req.complaint_text or "").strip()
+    if not text and not req.images:
+        raise HTTPException(status_code=400, detail="complaint_text or images is required")
+    deadline = time.time() + max(5, HANDLER_TIMEOUT_SECS - 1)
+    mode = (req.meta or {}).get("mode") or ""
+    t0 = time.time()
+    with fail_after(HANDLER_TIMEOUT_SECS):
+        fields = await anyio.to_thread.run_sync(_run, req, deadline, mode)
+    elapsed = time.time() - t0
+    route = "heuristic" if not _ollama_available() else "llm_or_mixed"
+    print(f"[summarize_json] route={route} mode={mode or 'auto'} input_len={len(text)} elapsed={elapsed:.1f}s")
+    keys = (req.meta or {}).get("keys") or "ko"
+    return _fields_to_dict(fields, keys)
+
 @app.post("/summarize")
 async def summarize(request: Request):
     try:
         ct_header = (request.headers.get("content-type") or "").lower()
         ignore_q = (request.query_params.get("ignore_images") or "").lower() in ("1", "true")
-
         if "application/json" in ct_header:
             data = await request.json()
             req = _json_to_request(data if isinstance(data, dict) else {})
             if ignore_q:
                 req.meta["ignore_images"] = True
-
         elif "multipart/form-data" in ct_header:
             form = await request.form()
             complaint_text = (form.get("complaint_text") or "").strip()
@@ -621,30 +671,24 @@ async def summarize(request: Request):
                 images=img_inputs,
                 meta={"ignore_images": not want_images or ignore_q}
             )
-
         else:
             raw = await request.body()
             req = SummarizeRequest(complaint_text=raw.decode("utf-8", "ignore"), images=[], meta={})
             if ignore_q:
                 req.meta["ignore_images"] = True
-
         deadline = time.time() + max(5, HANDLER_TIMEOUT_SECS - 1)
-
         t0 = time.time()
         with fail_after(HANDLER_TIMEOUT_SECS):
             fields = await anyio.to_thread.run_sync(_run, req, deadline)
         elapsed = time.time() - t0
         print(f"[summarize] elapsed={elapsed:.1f}s")
-
         wants_json = _wants_json(request, req.meta)
         lang_key = (request.query_params.get("keys") or (req.meta or {}).get("keys") or "ko")
-
         if wants_json:
             return _fields_to_dict(fields, lang_key)
         else:
             bullets = _format_bullets(fields)
             return PlainTextResponse(bullets)
-
     except AnyioTimeoutError:
         raise HTTPException(status_code=504, detail="server-timeout: summarize exceeded handler deadline")
     except HTTPException:

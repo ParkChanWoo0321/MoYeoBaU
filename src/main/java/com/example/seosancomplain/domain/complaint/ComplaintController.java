@@ -48,15 +48,6 @@ public class ComplaintController {
         return ResponseEntity.ok(complaintService.getMyComplaint(id, userName, phoneNumber));
     }
 
-    // 내 민원 수정 (본인확인)
-    @PatchMapping("/my/{id}")
-    public ResponseEntity<ComplaintResponseDto> updateMyComplaint(
-            @PathVariable Long id,
-            @RequestBody ComplaintRequestDto dto
-    ) {
-        return ResponseEntity.ok(complaintService.updateMyComplaint(id, dto));
-    }
-
     // 내 민원 삭제 (본인확인)
     @DeleteMapping("/my/{id}")
     public ResponseEntity<Map<String, Object>> deleteMyComplaint(

@@ -675,39 +675,27 @@ public class ComplaintService {
     private static String tidyKo(String s) {
         if (s == null) return "";
         String out = s.trim();
-
-        // 기본 정규화
         out = out.replaceAll("[~˜]+", "");
         out = out.replaceAll("\\s+", " ");
         out = out.replaceAll("\\s*,\\s*", ", ");
         out = out.replaceAll("\\s*\\.", ".");
         out = out.replaceAll("\\s+,", ",");
         out = out.replaceAll(",\\s*,", ", ");
-
-        // 비문/오타 교정
         out = out.replaceAll("문제이 발생했습니다", "문제가 발생했습니다");
         out = out.replaceAll("발생이 발생했습니다", "발생했습니다");
         out = out.replaceAll("파여 있음입니다", "파여 있습니다");
         out = out.replaceAll("들려 있고", "들떠 있고");
-
-        // 구어체 → 문어체
         out = out.replaceAll("있어요이", "있어요");
         out = out.replaceAll("있어요\\s*발생했습니다", "있습니다.");
         out = out.replaceAll("있어요(?![가-힣])", "있습니다");
         out = out.replaceAll("있음입니다", "있습니다");
         out = out.replaceAll("있음\\.", "있습니다.");
-
-        // 중복 문구 정리
         out = out.replaceAll("\\b(발생했습니다)(\\s*발생했습니다)+", "$1");
         out = out.replaceAll("\\b(위험이 있습니다)(\\s*위험이 있습니다)+", "$1");
         out = out.replaceAll("(입니다|습니다|해요|에요)\\s*(입니다|습니다)", "$1");
-
-        // 문장 끝에서의 중복·군더더기 제거
         out = out.replaceAll("(수 있습니다)\\s*위험이 있습니다\\.?$", "$1.");
         out = out.replaceAll("(수도 있습니다)\\s*위험이 있습니다\\.?$", "$1.");
         out = out.replaceAll("(위험합니다)\\s*위험이 있습니다\\.?$", "$1.");
-
-        // 마침표 보정
         if (!out.isEmpty() && !out.matches(".*[.?!]$")) out = out + ".";
         out = out.replaceAll("\\.(\\s*\\.)+$", ".");
         return out.trim();
@@ -715,24 +703,14 @@ public class ComplaintService {
 
     private static String tidyRequest(String s) {
         String out = tidyKo(s);
-
-        // '부탁드립니다이', '요청이 필요합니다' 등 정리
         out = out.replaceAll("부탁드립니다이", "부탁드립니다");
         out = out.replaceAll("요청이 필요합니다\\.?$", "요청합니다.");
-
-        // 종결 어구 중복 제거
         out = out.replaceAll("\\b부탁드립니다\\s*요청합니다\\.?$", "부탁드립니다.");
         out = out.replaceAll("\\b요청합니다\\s*부탁드립니다\\.?$", "요청합니다.");
-
-        // 두 번 이상 반복된 종결 제거
         out = out.replaceAll("\\b(부탁드립니다|요청합니다)\\b(\\s*\\1\\b)+\\.?$", "$1.");
-
-        // 여전히 '필요합니다'로 끝나면 요청형으로 통일
         if (out.matches(".*필요합니다\\.?$")) {
             out = out.replaceAll("필요합니다\\.?$", "요청합니다.");
         }
-
-        // 마지막 보정: 반드시 요청형으로 끝나도록
         if (!out.endsWith("요청합니다.") && !out.endsWith("부탁드립니다.")) {
             out = out.replaceAll("\\.*$", "") + " 요청합니다.";
         }

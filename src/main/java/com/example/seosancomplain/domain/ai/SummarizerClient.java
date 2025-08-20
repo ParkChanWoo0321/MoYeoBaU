@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatusCode;
@@ -18,12 +19,16 @@ import reactor.core.publisher.Mono;
 import java.time.Duration;
 import java.util.*;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class SummarizerClient {
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${ai.base-url}")
+    private String aiBaseUrl;
 
     @Value("${ai.summarizer.endpoint:/summarize}")
     private String endpoint;
@@ -33,15 +38,24 @@ public class SummarizerClient {
 
     public Mono<FieldsResponse> summarizeFieldsJson(String text, List<String> imageUrls) {
         SummarizeRequest req = new SummarizeRequest();
-        req.setComplaint_text(text == null ? "" : text);
-        if (imageUrls != null) imageUrls.forEach(url -> req.getImages().add(new ImageInput(url, null)));
+        String safe = text == null ? "" : text.trim();
+        req.setComplaint_text(safe);
+        if (imageUrls != null) {
+            imageUrls.forEach(url -> req.getImages().add(new ImageInput(url, null)));
+        }
         Map<String, Object> meta = new HashMap<>();
         meta.put("response", "json");
         meta.put("keys", "ko");
         req.setMeta(meta);
 
+
+        if (log.isDebugEnabled()) {
+            try { log.debug("[AI→JSON] POST {}{} payload={}", aiBaseUrl, endpoint, objectMapper.writeValueAsString(req)); }
+            catch (Exception ignore) {}
+        }
+
         return webClient.post()
-                .uri(endpoint)
+                .uri(aiBaseUrl + endpoint)
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .bodyValue(req)
@@ -60,7 +74,8 @@ public class SummarizerClient {
 
     public Mono<FieldsResponse> summarizeFieldsMultipart(String text, List<byte[]> imageBytesList) {
         MultipartBodyBuilder mb = new MultipartBodyBuilder();
-        mb.part("complaint_text", text == null ? "" : text);
+        String safe = text == null ? "" : text.trim();
+        mb.part("complaint_text", safe);
         if (imageBytesList != null) {
             int idx = 0;
             for (byte[] bytes : imageBytesList) {
@@ -73,8 +88,12 @@ public class SummarizerClient {
             }
         }
 
+        if (log.isDebugEnabled()) {
+            log.debug("[AI→MULTIPART] POST {}{} text.len={}", aiBaseUrl, endpoint, safe.length());
+        }
+
         return webClient.post()
-                .uri(endpoint)
+                .uri(aiBaseUrl + endpoint)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(BodyInserters.fromMultipartData(mb.build()))
