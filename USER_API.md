@@ -94,6 +94,11 @@
     "rejectionDetail": null,
     "comments": null,
     "commentCount": null
+    "summaryLocation": "",
+    "summaryPhenomenon": "",
+    "summaryProblem": "",
+    "summaryRisk": "",
+    "summaryRequest": ""
 }
 ```
 
@@ -123,6 +128,11 @@
         "rejectionDetail": null,
         "comments": null,
         "commentCount": null
+        "summaryLocation": "",
+        "summaryPhenomenon": "",
+        "summaryProblem": "",
+        "summaryRisk": "",
+        "summaryRequest": ""
     },
     {
         "id": 2,
@@ -142,6 +152,11 @@
         "rejectionDetail": null,
         "comments": null,
         "commentCount": null
+        "summaryLocation": "",
+        "summaryPhenomenon": "",
+        "summaryProblem": "",
+        "summaryRisk": "",
+        "summaryRequest": ""
     },
     {
         "id": 3,
@@ -161,6 +176,11 @@
         "rejectionDetail": null,
         "comments": null,
         "commentCount": null
+        "summaryLocation": "",
+        "summaryPhenomenon": "",
+        "summaryProblem": "",
+        "summaryRisk": "",
+        "summaryRequest": ""
     },
     {
         "id": 4,
@@ -180,6 +200,11 @@
         "rejectionDetail": null,
         "comments": null,
         "commentCount": null
+        "summaryLocation": "",
+        "summaryPhenomenon": "",
+        "summaryProblem": "",
+        "summaryRisk": "",
+        "summaryRequest": ""
     }
 ]
 ```
@@ -216,6 +241,11 @@
             "rejectionDetail": null,
             "comments": null,
             "commentCount": null
+            "summaryLocation": "",
+            "summaryPhenomenon": "",
+            "summaryProblem": "",
+            "summaryRisk": "",
+            "summaryRequest": ""
         },
         {
             "id": 3,
@@ -235,6 +265,11 @@
             "rejectionDetail": null,
             "comments": null,
             "commentCount": null
+            "summaryLocation": "",
+            "summaryPhenomenon": "",
+            "summaryProblem": "",
+            "summaryRisk": "",
+            "summaryRequest": ""
         },
         {
             "id": 4,
@@ -254,6 +289,11 @@
             "rejectionDetail": null,
             "comments": null,
             "commentCount": null
+            "summaryLocation": "",
+            "summaryPhenomenon": "",
+            "summaryProblem": "",
+            "summaryRisk": "",
+            "summaryRequest": ""
         }
     ],
     "totalCount": 3
@@ -285,49 +325,14 @@
     "rejectionDetail": null,
     "comments": null,
     "commentCount": null
+    "summaryLocation": "",
+    "summaryPhenomenon": "",
+    "summaryProblem": "",
+    "summaryRisk": "",
+    "summaryRequest": ""
 }
 ```
 
----
-
-## 내 민원 수정
-
-**PATCH** `/api/complaints/my/{id}`
-
-**Request Body**
-
-```json
-{
-  "title":"쓰레기",
-  "userName": "홍길동",
-  "phoneNumber": "01012345678",
-  "content": "도로에 쓰레기가 치워지지 않아요",
-  "address": "해미면",
-  "category": "ENVIRONMENT_CLEANING"
-}
-```
-
-**Response 200**
-
-```json
-{
-    "id": 1,
-    "title": "쓰레기",
-    "content": "도로에 쓰레기가 치워지지 않아요",
-    "address": "해미면",
-    "category": "ENVIRONMENT_CLEANING",
-    "status": "PENDING",
-    "imageUrls": [],
-    "userName": "홍길동",
-    "phoneNumber": "010-1234-5678",
-    "createdAt": "2025-08-15T18:20:32.413387",
-    "updatedAt": "2025-08-15T22:10:36.713704100",
-    "rejectionReason": "ALREADY_RESOLVED",
-    "rejectionDetail": null,
-    "comments": null,
-    "commentCount": null
-}
-```
 ---
 
 ## 내 민원 삭제
@@ -370,6 +375,11 @@
     "rejectionDetail": null,
     "comments": null,
     "commentCount": null
+    "summaryLocation": "",
+    "summaryPhenomenon": "",
+    "summaryProblem": "",
+    "summaryRisk": "",
+    "summaryRequest": ""
 }
 ```
 
@@ -513,6 +523,11 @@
         "rejectionDetail": null,
         "comments": null,
         "commentCount": null
+        "summaryLocation": "",
+        "summaryPhenomenon": "",
+        "summaryProblem": "",
+        "summaryRisk": "",
+        "summaryRequest": ""
     },
     {
         "id": 3,
@@ -532,6 +547,11 @@
         "rejectionDetail": null,
         "comments": null,
         "commentCount": null
+        "summaryLocation": "",
+        "summaryPhenomenon": "",
+        "summaryProblem": "",
+        "summaryRisk": "",
+        "summaryRequest": ""
     },
     {
         "id": 2,
@@ -551,6 +571,11 @@
         "rejectionDetail": null,
         "comments": null,
         "commentCount": null
+        "summaryLocation": "",
+        "summaryPhenomenon": "",
+        "summaryProblem": "",
+        "summaryRisk": "",
+        "summaryRequest": ""
     }
 ]
 ```
