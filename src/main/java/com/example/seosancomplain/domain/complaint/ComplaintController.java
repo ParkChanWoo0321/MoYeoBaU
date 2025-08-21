@@ -24,6 +24,12 @@ public class ComplaintController {
         return ResponseEntity.ok(complaintService.createComplaint(dto));
     }
 
+    // 민원 ai 작성
+    @PostMapping("/ai/compose")
+    public ResponseEntity<AiComposeResponseDto> compose(@RequestBody @Valid AiComposeRequestDto dto) {
+        return ResponseEntity.ok(complaintService.composeOnly(dto));
+    }
+
     // 내 민원 목록 조회 (본인확인)
     @GetMapping("/my")
     public ResponseEntity<ComplaintListDto> getMyComplaints(

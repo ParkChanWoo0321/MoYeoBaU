@@ -15,6 +15,8 @@ public class ComplaintRequestDto {
     private String title;
     private String content;
     private String address;
+    private String docHtml;                // AI/사용자 최종본(HTML) (선택)
+    private String docMarkdown;
     private List<ComplaintCategory> categories;
     private List<String> imageUrls;
     // 본인확인
