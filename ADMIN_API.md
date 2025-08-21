@@ -111,10 +111,7 @@
 
 ```json
 {
-    "totalCount": 0,
-    "completedCount": 0,
-    "processingCount": 0,
-    "pendingCount": 0
+    "url": "https://minwon.example.go.kr/reports/daily/2025/08/13/report_20250813.pdf"
 }
 ```
 
@@ -128,10 +125,7 @@
 
 ```json
 {
-    "totalCount": 2,
-    "completedCount": 0,
-    "processingCount": 0,
-    "pendingCount": 2
+    "url": "https://minwon.example.go.kr/reports/daily/2025/08/13/report_202508.pdf"
 }
 ```
 
