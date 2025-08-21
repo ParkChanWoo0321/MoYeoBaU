@@ -7,6 +7,7 @@ import com.example.seosancomplain.domain.admin.comment.AdminCommentDto;
 import com.example.seosancomplain.domain.admin.comment.AdminCommentRepository;
 import com.example.seosancomplain.domain.admin.dto.AdminReportDto;
 import com.example.seosancomplain.domain.admin.dto.CategoryCountDto;
+import com.example.seosancomplain.domain.ai.AiMinwonClient;
 import com.example.seosancomplain.domain.ai.SummarizerClient;
 import com.example.seosancomplain.domain.attachment.Attachment;
 import com.example.seosancomplain.domain.attachment.AttachmentRepository;
@@ -17,6 +18,7 @@ import com.example.seosancomplain.dto.ComplaintResponseDto;
 import com.example.seosancomplain.exception.CustomException;
 import com.example.seosancomplain.exception.ErrorCode;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +50,7 @@ public class ComplaintService {
     private final AttachmentRepository attachmentRepository;
     private final ObjectMapper objectMapper;
     private final SummarizerClient summarizerClient;
+    private final AiMinwonClient aiMinwonClient;
 
     @Value("${ai.timeout.response-ms:300000}")
     private long aiTimeoutMs;
@@ -57,27 +60,215 @@ public class ComplaintService {
 
     @Transactional
     public ComplaintResponseDto createComplaint(ComplaintRequestDto dto) {
-        if (dto.getTitle() == null || dto.getTitle().isBlank())
-            throw new CustomException(ErrorCode.VALIDATION_FAIL, "제목을 입력해 주세요.");
-        if (dto.getContent() == null || dto.getContent().isBlank())
-            throw new CustomException(ErrorCode.VALIDATION_FAIL, "민원 내용을 입력해 주세요.");
+        // 0) 최소 요건: 주소 유효 + (내용 or 이미지 중 하나는 존재)
+        if (isBlank(dto.getAddress()) || !SeosanRegion.isValid(dto.getAddress())) {
+            throw new CustomException(ErrorCode.VALIDATION_FAIL, "지역은 서산시 읍·면·동 중에서 선택해 주세요.");
+        }
+        List<String> imageUrls = (dto.getImageUrls() == null) ? List.of() : dto.getImageUrls();
+        boolean hasImages = !imageUrls.isEmpty();
+
+        if (isBlank(dto.getContent()) && !hasImages) {
+            throw new CustomException(ErrorCode.VALIDATION_FAIL, "민원 내용이나 사진 중 하나는 입력해 주세요.");
+        }
+
+        // 1) “작성 필요 여부” 판단
+        boolean auto = dto.getAutoCompose() == null || Boolean.TRUE.equals(dto.getAutoCompose());
+        boolean weak = isWeak(dto.getContent()); // 예: 40자 미만 또는 빈 내용
+        boolean wantAi = auto;
+
+        log.info("AI compose: auto={}, weak={}, hasImages={}, wantAi={}", auto, weak, hasImages, wantAi);
+
+        // 2) 필요 시 LLM 호출 (등록과 같은 요청에서 수행)
+        String docHtml = null, docMd = null, aiTitle = null, aiAddr = null;
+        List<ComplaintCategory> aiCats = null;
+
+        if (wantAi) {
+            try {
+                var images = hasImages
+                        ? dto.getImageUrls().stream().map(AiMinwonClient.ImageInput::fromUrl).toList()
+                        : List.<AiMinwonClient.ImageInput>of();
+
+                var in = AiMinwonClient.AiComposeIn.builder()
+                        .complaintText(dto.getContent() == null ? "" : dto.getContent())
+                        .images(images)
+                        .meta(defaultSeosanMeta(null))
+                        .build();
+
+                var out = aiMinwonClient.compose(in); // 타임아웃은 AiMinwonClient에서 45~60s로 설정 권장
+
+                aiTitle = out.getTitle();
+                docHtml = firstNotBlank(out.getDocHtml(), null);
+                docMd   = firstNotBlank(out.getDocMarkdown(), out.getBody()); // md 없으면 body fallback
+
+                var names = extractCategories(out.getFields());
+                if (!names.isEmpty()) {
+                    aiCats = mapCategoryNamesToEnum(names); // 앞서 만든 enum 매핑 헬퍼
+                }
+                aiAddr = textOrNull(out.getFields(), "address");
+
+            } catch (AiMinwonClient.AiComposeException e) {
+                // 작성 실패 → 저장은 진행하되 상태만 표시
+                log.warn("[AI] compose 실패: {}", e.getMessage());
+            }
+        }
+
+        // 3) DTO 보충
+        if (isBlank(dto.getTitle()) && notBlank(aiTitle)) dto.setTitle(aiTitle);
+        if ((dto.getCategories() == null || dto.getCategories().isEmpty()) && aiCats != null && !aiCats.isEmpty()) {
+            dto.setCategories(aiCats);
+        }
+        if (isBlank(dto.getAddress()) && notBlank(aiAddr)) {
+            dto.setAddress(aiAddr);
+        }
+
+        // 4) 최종 검증 (제목/내용/카테고리/주소) — “등록+작성” 한 번에 끝내려면 여기서 보장
+        if (isBlank(dto.getTitle()))   dto.setTitle("민원서"); // 제목 없으면 기본값
+        if (isBlank(dto.getContent()) && isBlank(docHtml) && isBlank(docMd)) {
+            // LLM 실패 + 내용도 빈 경우 → 사용자에게 명확히 안내
+            throw new CustomException(ErrorCode.VALIDATION_FAIL, "민원서 자동 작성이 지연되었습니다. 내용을 입력하거나 이미지를 추가해 주세요.");
+        }
         if (dto.getCategories() == null || dto.getCategories().isEmpty())
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "카테고리를 선택해 주세요.");
-        if (dto.getAddress() == null || dto.getAddress().isBlank())
-            throw new CustomException(ErrorCode.VALIDATION_FAIL, "주소(읍·면·동)를 입력해 주세요.");
-        if (!SeosanRegion.isValid(dto.getAddress()))
-            throw new CustomException(ErrorCode.VALIDATION_FAIL, "지역은 서산시 읍·면·동 중에서 선택해 주세요.");
 
-        Complaint complaint = toEntity(dto);
-        if (dto.getImageUrls() != null && !dto.getImageUrls().isEmpty())
-            complaint.setImageUrl(dto.getImageUrls().getFirst());
-        complaintRepository.save(complaint);
+        // 5) 저장
+        Complaint entity = toEntity(dto);
+        if (hasImages) entity.setImageUrl(dto.getImageUrls().get(0));
 
-        if (dto.getImageUrls() != null && !dto.getImageUrls().isEmpty()) {
-            attachImages(complaint, dto.getImageUrls());
+        if (notBlank(docHtml)) {
+            entity.setDocHtml(docHtml);
+            entity.setComposeStatus(ComposeStatus.COMPOSED);
+            entity.setComposeError(null);
+        } else if (notBlank(docMd)) {
+            entity.setDocMarkdown(docMd);
+            entity.setComposeStatus(ComposeStatus.COMPOSED);
+            entity.setComposeError(null);
+        } else {
+            entity.setComposeStatus(wantAi ? ComposeStatus.FAILED : ComposeStatus.NONE);
+            entity.setComposeError(wantAi ? "AI compose not executed or no output" : null);
         }
-        return toDto(complaint);
+
+        complaintRepository.save(entity);
+        if (hasImages) attachImages(entity, dto.getImageUrls());
+
+        return toDto(entity); // toDto에서 docHtml/docMarkdown/composeStatus 매핑 포함
     }
+
+    // 라벨 리스트 -> enum 리스트
+    private List<ComplaintCategory> mapCategoryNamesToEnum(List<String> names) {
+        if (names == null || names.isEmpty()) return List.of();
+        return names.stream()
+                .map(this::toCategoryEnum)   // 한 개 라벨을 enum으로
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    // 라벨 하나 -> enum 하나 (네 enum 값에 맞춘 매핑)
+    private ComplaintCategory toCategoryEnum(String name) {
+        String k = normalizeCat(name);
+
+        // 1) enum 명칭/직역에 가까운 표현
+        if (k.equals("environmentcleaning") || k.equals("환경청소")) return ComplaintCategory.ENVIRONMENT_CLEANING;
+        if (k.equals("facilitydamage")      || k.equals("시설물파손") || k.equals("시설물관리")) return ComplaintCategory.FACILITY_DAMAGE;
+        if (k.equals("trafficparking")      || k.equals("교통주정차")) return ComplaintCategory.TRAFFIC_PARKING;
+        if (k.equals("safetyrisk")          || k.equals("안전위험"))   return ComplaintCategory.SAFETY_RISK;
+        if (k.equals("livinginconvenience") || k.equals("생활불편"))   return ComplaintCategory.LIVING_INCONVENIENCE;
+        if (k.equals("othersadmin")         || k.equals("기타행정")   || k.equals("행정"))     return ComplaintCategory.OTHERS_ADMIN;
+
+        // 2) 일반적인 키워드 매핑(한국어/영어 혼합, 공백/슬래시 제거 기준)
+        if (k.contains("주차") || k.contains("교통") || k.contains("parking") || k.contains("traffic") || k.contains("이중주차") || k.contains("불법주정차"))
+            return ComplaintCategory.TRAFFIC_PARKING;
+
+        if (k.contains("쓰레기") || k.contains("무단투기") || k.contains("환경") || k.contains("청소")
+                || k.contains("분리수거") || k.contains("낙엽") || k.contains("폐기물")
+                || k.contains("garbage") || k.contains("waste") || k.contains("litter"))
+            return ComplaintCategory.ENVIRONMENT_CLEANING;
+
+        if (k.contains("파손") || k.contains("고장") || k.contains("보수") || k.contains("보도블럭")
+                || k.contains("도로파손") || k.contains("가로등") || k.contains("신호등")
+                || k.contains("표지판") || k.contains("난간") || k.contains("펜스")
+                || k.contains("damage") || k.contains("broken") || k.contains("repair"))
+            return ComplaintCategory.FACILITY_DAMAGE;
+
+        if (k.contains("안전") || k.contains("위험") || k.contains("침수") || k.contains("낙석")
+                || k.contains("전선") || k.contains("전도") || k.contains("hazard")
+                || k.contains("safety") || k.contains("risk") || k.contains("danger"))
+            return ComplaintCategory.SAFETY_RISK;
+
+        if (k.contains("생활") || k.contains("불편") || k.contains("소음")
+                || k.contains("complaint") || k.contains("noise") || k.contains("odor") || k.contains("악취"))
+            return ComplaintCategory.LIVING_INCONVENIENCE;
+
+        if (k.contains("행정") || k.contains("기타") || k.contains("other") || k.contains("admin"))
+            return ComplaintCategory.OTHERS_ADMIN;
+
+        return null; // 매핑 실패 시 null (상위에서 filter)
+    }
+
+    // 라벨 정규화(공백/슬래시/하이픈 제거 + 영어 소문자화)
+    private String normalizeCat(String s) {
+        if (s == null) return "";
+        String t = s.replaceAll("\\s+", "")  // 공백 제거
+                .replace("/", "")
+                .replace("-", "");
+        return t.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private boolean isWeak(String content) {
+        int len = (content == null) ? 0
+                : content.replaceAll("<[^>]+>", "").trim().length(); // HTML 제거 후 길이
+        return len < 40;  // 임계치 원하는 값으로 조정(예: 40~80)
+    }
+
+    private boolean isBlank(String s) { return s == null || s.isBlank(); }
+    private boolean notBlank(String s) { return s != null && !s.isBlank(); }
+
+    private String firstNotBlank(String... vals) {
+        if (vals == null) return null;
+        for (String v : vals) if (notBlank(v)) return v;
+        return null;
+    }
+
+    // 서산 기본 메타 주입
+    private Map<String, Object> defaultSeosanMeta(Map<String, Object> in) {
+        Map<String, Object> meta = new HashMap<>();
+        if (in != null) meta.putAll(in);
+        meta.putIfAbsent("org", "서산시청");
+        meta.putIfAbsent("receiver", "서산시청장 귀하");
+        meta.putIfAbsent("title_prefix", "[서산시]");
+        return meta;
+    }
+
+    // AI fields에서 카테고리/주소 후보 추출
+    private List<String> extractCategories(JsonNode fields) {
+        if (fields == null) return List.of();
+
+        var node = fields.path("categories");
+        if (node.isArray() && node.size() > 0) {
+            List<String> list = new ArrayList<>();
+            node.forEach(n -> { if (n.isTextual()) list.add(n.asText()); });
+            if (!list.isEmpty()) return list;
+        }
+        node = fields.path("category_candidates");
+        if (node.isArray() && node.size() > 0) {
+            List<String> list = new ArrayList<>();
+            node.forEach(n -> { if (n.isTextual()) list.add(n.asText()); });
+            if (!list.isEmpty()) return list;
+        }
+        var cat = textOrNull(fields, "category");
+        if (notBlank(cat)) return List.of(cat);
+        cat = textOrNull(fields, "category_primary");
+        if (notBlank(cat)) return List.of(cat);
+
+        return List.of();
+    }
+
+    private String textOrNull(JsonNode node, String key) {
+        if (node == null) return null;
+        var v = node.path(key);
+        return v.isMissingNode() || v.isNull() ? null : v.asText(null);
+    }
+
 
     public List<ComplaintResponseDto> getMyComplaints(String userName, String phoneNumber) {
         return complaintRepository.findByUserNameAndPhoneNumber(userName, phoneNumber)
@@ -236,6 +427,10 @@ public class ComplaintService {
                 .summaryProblem(fields.getOrDefault("problem", ""))
                 .summaryRisk(fields.getOrDefault("risk", ""))
                 .summaryRequest(fields.getOrDefault("request", ""))
+                .docHtml(c.getDocHtml())
+                .docMarkdown(c.getDocMarkdown())
+                .composeStatus(c.getComposeStatus() != null ? c.getComposeStatus().name() : "NONE")
+                .composeError(c.getComposeError())
                 .build();
     }
 

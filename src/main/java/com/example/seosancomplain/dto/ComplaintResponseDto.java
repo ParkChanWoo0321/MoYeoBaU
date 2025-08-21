@@ -34,4 +34,8 @@ public class ComplaintResponseDto {
     private String summaryProblem;
     private String summaryRisk;
     private String summaryRequest;
+    private String docHtml;
+    private String docMarkdown;
+    private String composeStatus;
+    private String composeError;
 }

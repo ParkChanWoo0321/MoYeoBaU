@@ -25,6 +25,16 @@ public class Complaint {
     @Enumerated(EnumType.STRING)
     private RejectionReason rejectionReason;
 
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 16)
+    @Builder.Default
+    private ComposeStatus composeStatus = ComposeStatus.NONE;
+
+    @Lob private String docHtml;
+    @Lob private String docMarkdown;
+    private String composeError;
+
     @Column(length = 1000)
     private String rejectionDetail;
 
