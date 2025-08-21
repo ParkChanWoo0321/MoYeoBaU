@@ -350,7 +350,7 @@
     "address": "해미면",
     "categories": ["FACILITY_DAMAGE", "SAFETY_RISK", "ENVIRONMENT_CLEANING"],
     "status": "PENDING",
-    ""imageUrls": ["http://localhost:8080/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"],
+    "imageUrls": ["http://localhost:8080/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"],
     "userName": "김멋사",
     "phoneNumber": "010-1234-5678",
     "createdAt": "2025-08-15T18:48:26.550027",
