@@ -1,5 +1,7 @@
 package com.example.seosancomplain.domain.admin;
 
+import com.example.seosancomplain.domain.Report.ReportDownloadLink;
+import com.example.seosancomplain.domain.Report.ReportLinkService;
 import com.example.seosancomplain.domain.admin.comment.AdminCommentDto;
 import com.example.seosancomplain.dto.ComplaintDetailDto;
 import com.example.seosancomplain.domain.admin.dto.ComplaintStatusUpdateDto;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +37,7 @@ import java.util.Map;
 public class AdminController {
 
     private final ComplaintService complaintService;
+    private final ReportLinkService reportLinkService;
 
     @Value("${admin.secret}")
     private String adminSecret;
@@ -99,19 +103,19 @@ public class AdminController {
 
     // 일간 리포트
     @GetMapping("/report/daily")
-    public ResponseEntity<AdminReportDto> reportDaily(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
-        LocalDate d = (day == null) ? LocalDate.now() : day;
-        return ResponseEntity.ok(complaintService.getAdminReport(d, d));
+    public ReportDownloadLink daily(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day
+    ) {
+        String link = reportLinkService.buildDailyUrl(day);
+        return ReportDownloadLink.builder().url(link).build();
     }
 
     // 월간 리포트
     @GetMapping("/report/monthly")
-    public ResponseEntity<AdminReportDto> reportMonthly(@RequestParam String yearMonth) {
-        java.time.YearMonth ym = java.time.YearMonth.parse(yearMonth);
-        LocalDate from = ym.atDay(1);
-        LocalDate to   = ym.atEndOfMonth();
-        return ResponseEntity.ok(complaintService.getAdminReport(from, to));
+    public ReportDownloadLink monthly(@RequestParam String yearMonth) {
+        YearMonth ym = YearMonth.parse(yearMonth); // yyyy-MM
+        String link = reportLinkService.buildMonthlyUrl(ym);
+        return ReportDownloadLink.builder().url(link).build();
     }
 
     // AI 요약
