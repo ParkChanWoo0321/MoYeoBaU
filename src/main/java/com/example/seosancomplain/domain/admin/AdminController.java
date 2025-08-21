@@ -101,21 +101,19 @@ public class AdminController {
         return ResponseEntity.ok(complaintService.updateStatus(id, statusUpdateDto.getStatus()));
     }
 
-    // 일간 리포트
-    @GetMapping("/report/daily")
-    public ReportDownloadLink daily(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day
-    ) {
-        String link = reportLinkService.buildDailyUrl(day);
-        return ReportDownloadLink.builder().url(link).build();
-    }
-
     // 월간 리포트
     @GetMapping("/report/monthly")
     public ReportDownloadLink monthly(@RequestParam String yearMonth) {
-        YearMonth ym = YearMonth.parse(yearMonth); // yyyy-MM
-        String link = reportLinkService.buildMonthlyUrl(ym);
-        return ReportDownloadLink.builder().url(link).build();
+        YearMonth ym = YearMonth.parse(yearMonth);
+        String url = reportLinkService.getMonthlyPdfUrl(ym);
+        return new ReportDownloadLink(url);
+    }
+
+    // 일간 리포트
+    @GetMapping("/report/daily")
+    public ReportDownloadLink daily(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate day) {
+        String url = reportLinkService.getWeeklyPdfUrl(day);
+        return new ReportDownloadLink(url);
     }
 
     // AI 요약
