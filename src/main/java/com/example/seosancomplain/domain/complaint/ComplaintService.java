@@ -97,8 +97,63 @@ public class ComplaintService {
             throw new CustomException(ErrorCode.VALIDATION_FAIL,
                     "민원서 내용이 비어 있습니다. AI 작성 결과를 반영해 제목/본문을 채워 주세요.");
         }
+        // 카테고리
+        if (dto.getCategories() == null || dto.getCategories().isEmpty()) {
+            try {
+                var in = AiMinwonClient.AiComposeIn.builder()
+                        .complaintText(firstNotBlank(
+                                content,
+                                docMd,
+                                asPlainText(docHtml)  // HTML 본문이 왔으면 텍스트로 정리
+                        ))
+                        .images(imageUrls.stream().map(AiMinwonClient.ImageInput::fromUrl).toList())
+                        .meta(defaultSeosanMeta(null))
+                        .build();
 
-        // 2) 제목/카테고리 검증
+                var out = aiMinwonClient.compose(in);
+
+                // 제목/본문이 비어 있으면 AI 결과로 채워주기
+                if (isBlank(dto.getTitle())) {
+                    dto.setTitle(firstNotBlank(out.getTitle(), "민원서"));
+                }
+                if (isBlank(docHtml) && isBlank(docMd)) {
+                    dto.setDocHtml(firstNotBlank(out.getDocHtml(), null));
+                    dto.setDocMarkdown(firstNotBlank(out.getDocMarkdown(), out.getBody()));
+                    docHtml  = dto.getDocHtml();
+                    docMd    = dto.getDocMarkdown();
+                    content  = firstNotBlank(content, out.getBody());
+                }
+
+                // 카테고리 후보 → enum 매핑
+                var candidates = extractCategories(out.getFields()); // List<String>
+                var enums = mapCategoryNamesToEnum(candidates);      // List<ComplaintCategory>
+
+                // 후보가 비면 텍스트 기반 간이 추정
+                if (enums.isEmpty()) {
+                    var guess = toCategoryEnum(firstNotBlank(
+                            content, out.getBody(), out.getTitle()
+                    ));
+                    if (guess != null) {
+                        enums = List.of(guess);
+                    }
+                }
+
+                // 마지막 보루(정말 못 찾은 경우): 기타행정으로 기본값
+                if (enums.isEmpty()) {
+                    enums = List.of(ComplaintCategory.OTHERS_ADMIN);
+                }
+                dto.setCategories(enums);
+
+            } catch (Exception e) {
+                // AI 호출 실패 시에도 서비스가 막히지 않도록 최소한의 동작
+                var fallback = toCategoryEnum(firstNotBlank(content, docMd, asPlainText(docHtml)));
+                dto.setCategories(fallback != null
+                        ? List.of(fallback)
+                        : List.of(ComplaintCategory.OTHERS_ADMIN));
+                if (isBlank(dto.getTitle())) dto.setTitle("민원서");
+            }
+        }
+
         if (isBlank(dto.getTitle())) {
             dto.setTitle("민원서");
         }
@@ -135,6 +190,13 @@ public class ComplaintService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+    }
+
+    private String asPlainText(String html) {
+        if (html == null) return null;
+        return html.replaceAll("<[^>]+>", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     // 라벨 하나 -> enum 하나 (네 enum 값에 맞춘 매핑)
@@ -188,11 +250,6 @@ public class ComplaintService {
         return t.toLowerCase(java.util.Locale.ROOT);
     }
 
-    private boolean isWeak(String content) {
-        int len = (content == null) ? 0
-                : content.replaceAll("<[^>]+>", "").trim().length(); // HTML 제거 후 길이
-        return len < 40;  // 임계치 원하는 값으로 조정(예: 40~80)
-    }
 
     private JsonNode toJsonNode(Object v) {
         if (v == null) return NullNode.getInstance();

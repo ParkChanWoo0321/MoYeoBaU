@@ -54,6 +54,41 @@
 ```
 
 ---
+## AI 민원서 작성 (초안 생성)
+
+**POST** `/api/complaints/ai/compose`
+
+**Request Body**
+
+```json
+{
+  "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다.",
+  "imageUrls": [
+    "http://localhost:8080/uploads/sample.png"
+  ]
+}
+
+```
+
+**Response 201**
+```json
+{
+"title": "[서산시] 파손이 발생했습니다.",
+"docHtml": null,
+"docMarkdown": "서산시청장 귀하\n\n아래 사항에 대한 민원을 신청드립니다.\n\n1) 위치: 서산시에서 발생했습니다.\n2) 현상: 서산시청장 귀하 아래 사항에 대한 민원을 신청드립니다.\n3) 문제점: 파손이 발생했습니다.\n4) 위험성: 위험 위험이 있습니다.\n5) 요청사항: 요청이 필요합니다.\n\n위 사안에 대한 확인과 적절한 조치를 부탁드립니다.\n감사합니다.",
+"fields": {
+"위치": "서산시에서 발생했습니다.",
+"현상": "서산시청장 귀하 아래 사항에 대한 민원을 신청드립니다.",
+"문제점": "파손이 발생했습니다.",
+"위험성": "위험 위험이 있습니다.",
+"요청사항": "요청이 필요합니다."
+},
+"categorySuggestions": [],
+"addressCandidate": null
+}
+```
+
+---
 
 ## 민원 접수하기
 
@@ -66,9 +101,9 @@
   "title":"공원시설의 문제",
   "userName": "김멋사",
   "phoneNumber": "01012345678",
-  "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
+  "content": "서산시청장 귀하\n\n아래 사항에 대한 민원을 신청드립니다.\n\n1) 위치: 산책로에서 발생했습니다.\n2) 현상: 서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다.\n3) 문제점: 파손이 발생했습니다.\n4) 위험성: 미상\n5) 요청사항: 미상\n\n위 사안에 대한 확인과 적절한 조치를 부탁드립니다.\n감사합니다.",
   "address": "해미면",
-  "categories": ["FACILITY_DAMAGE", "SAFETY_RISK", "ENVIRONMENT_CLEANING"]
+  "categories": ["FACILITY_DAMAGE", "SAFETY_RISK", "ENVIRONMENT_CLEANING"],
   "imageUrls": ["http://localhost:8080/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"]
 }
 ```
@@ -77,26 +112,36 @@
 
 ```json
 {
-    "id": 4,
-    "title": "공원시설의 문제",
-    "content": "서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다. 위치는 중앙공원 내 체육시설을 지나 연못 쪽으로 가는 산책로 중간쯤입니다. 보도블록이 여러 개 들떠 있고, 한 부분은 아예 깨져서 구멍처럼 파여 있어요. 최근 비가 와서 물이 고여있는데, 바닥이 울퉁불퉁해서 지나다니기 불편하고, 특히 밤에는 어두워서 발을 헛디뎌 넘어질까 봐 매우 위험합니다. 아이들이 뛰어다니다 다칠까 봐 걱정도 됩니다.시민들이 안전하게 산책로를 이용할 수 있도록 빠른 시일 내에 보수 부탁드립니다.",
-    "address": "해미면",
-    "categories": ["FACILITY_DAMAGE", "SAFETY_RISK", "ENVIRONMENT_CLEANING"],
-    "status": "PENDING",
-    "imageUrls": ["http://localhost:8080/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"],
-    "userName": "김멋사",
-    "phoneNumber": "010-1234-5678",
-    "createdAt": "2025-08-15T22:07:43.997826900",
-    "updatedAt": "2025-08-15T22:07:43.997826900",
-    "rejectionReason": null,
-    "rejectionDetail": null,
-    "comments": null,
-    "commentCount": null
-    "summaryLocation": "",
-    "summaryPhenomenon": "",
-    "summaryProblem": "",
-    "summaryRisk": "",
-    "summaryRequest": ""
+  "id": 18,
+  "title": "공원시설의 문제",
+  "content": "서산시청장 귀하\n\n아래 사항에 대한 민원을 신청드립니다.\n\n1) 위치: 산책로에서 발생했습니다.\n2) 현상: 서산 중앙공원 산책로를 이용하다가 바닥이 심하게 파손된 구간을 발견했습니다.\n3) 문제점: 파손이 발생했습니다.\n4) 위험성: 미상\n5) 요청사항: 미상\n\n위 사안에 대한 확인과 적절한 조치를 부탁드립니다.\n감사합니다.",
+  "address": "해미면",
+  "categories": [
+    "FACILITY_DAMAGE",
+    "SAFETY_RISK",
+    "ENVIRONMENT_CLEANING"
+  ],
+  "status": "PENDING",
+  "imageUrls": [
+    "http://localhost:8080/uploads/8647fb9e-0668-43c1-9ed9-377f47edd24d.png"
+  ],
+  "userName": "김멋사",
+  "phoneNumber": "010-1234-5678",
+  "createdAt": "2025-08-22T15:48:41.131840",
+  "updatedAt": "2025-08-22T15:48:41.131840",
+  "rejectionReason": null,
+  "rejectionDetail": null,
+  "comments": null,
+  "commentCount": null,
+  "summaryLocation": "",
+  "summaryPhenomenon": "",
+  "summaryProblem": "",
+  "summaryRisk": "",
+  "summaryRequest": "",
+  "docHtml": null,
+  "docMarkdown": null,
+  "composeStatus": "NONE",
+  "composeError": null
 }
 ```
 

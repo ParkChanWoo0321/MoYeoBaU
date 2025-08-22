@@ -35,7 +35,7 @@ public class AiMinwonClient {
                     .bodyValue(in)
                     .retrieve()
                     .bodyToMono(AiComposeOut.class)
-                    .block(Duration.ofSeconds(15));
+                    .block(Duration.ofSeconds(60));
         } catch (WebClientResponseException e) {
             log.warn("[AI] compose HTTP {}: {}", e.getRawStatusCode(), e.getResponseBodyAsString());
             throw new AiComposeException("AI 서버 응답 오류: " + e.getRawStatusCode(), e);
