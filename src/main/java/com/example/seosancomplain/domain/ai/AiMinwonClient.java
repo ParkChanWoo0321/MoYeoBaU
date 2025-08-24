@@ -136,10 +136,10 @@ public class AiMinwonClient {
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AiComposeOut {
-        /** 제목 후보 */
+        //제목
         private String title;
 
-        /** 본문(우선순위: html → markdown → body) */
+        // 본문(우선순위: html → markdown → body)
         @JsonProperty("doc_html")
         private String docHtml;
 
@@ -148,13 +148,12 @@ public class AiMinwonClient {
 
         private String body;
 
-        /** 추출 필드(주소/시간/카테고리 후보 등) */
+        // 추출 필드(주소/시간/카테고리 후보 등)
         private JsonNode fields;
 
-        /** 최종 메타(서산 기본 포함 가능) */
+        // 최종 메타(서산 기본 포함 가능)
         private JsonNode meta;
 
-        /** 원본 raw (선택) */
         @JsonProperty("raw")
         private JsonNode raw;
     }

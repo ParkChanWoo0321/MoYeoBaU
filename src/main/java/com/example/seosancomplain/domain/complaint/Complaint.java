@@ -38,7 +38,7 @@ public class Complaint {
     @Column(length = 1000)
     private String rejectionDetail;
 
-    @ElementCollection(fetch = FetchType.EAGER) // 조회가 잦다면 EAGER 권장, 성능 이슈시 LAZY로
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
             name = "complaint_categories",
             joinColumns = @JoinColumn(name = "complaint_id")

@@ -24,7 +24,7 @@ public class ComplaintController {
         return ResponseEntity.ok(complaintService.createComplaint(dto));
     }
 
-    // 민원 ai 작성
+    // 민원서 ai 작성
     @PostMapping("/ai/compose")
     public ResponseEntity<AiComposeResponseDto> compose(@RequestBody @Valid AiComposeRequestDto dto) {
         return ResponseEntity.ok(complaintService.composeOnly(dto));

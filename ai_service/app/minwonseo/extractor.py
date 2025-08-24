@@ -1,11 +1,10 @@
-# app/services/extractor.py
 import os, re, json, requests
 from typing import Dict, Any, List, Optional
 from .io import SummarizeRequest
 from .fields import ComplaintFields
+from .textutils_ko import tidy_fields
 
-# ===== 설정 (환경변수) =====
-USE_LLM          = os.getenv("EXTRACT_USE_LLM", "1") == "1"     # 기본 ON
+USE_LLM          = os.getenv("EXTRACT_USE_LLM", "1") == "1"
 OLLAMA_URL       = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 EXTRACT_MODEL    = os.getenv("EXTRACT_MODEL", "llama3.1:8b")
 CONNECT_TIMEOUT  = int(os.getenv("EXTRACT_CONNECT_TIMEOUT", "2"))
@@ -22,7 +21,7 @@ def _sent_split_ko(text: str) -> List[str]:
     if not t:
         return []
     try:
-        import kss  # optional
+        import kss
         return [s.strip() for s in kss.split_sentences(t) if s.strip()]
     except Exception:
         tmp = re.sub(r"(다\.|요\.|니다\.|습니다\.|[.!?])\s*", r"\1<eos>", t)
@@ -34,7 +33,7 @@ def _urls_hint(images) -> str:
         return ""
     return "참고 이미지 URL: " + " ".join(urls[:5])
 
-# ===== 휴리스틱 규칙 =====
+# ===== 휴리스틱 =====
 _ADDR_PAT = re.compile(
     r"(?:[가-힣A-Za-z0-9]+(?:시|군|구|읍|면|동|리)|"
     r"[가-힣A-Za-z0-9]+(?:로|길)\s?\d*(?:-\d+)?|"
@@ -59,7 +58,6 @@ def _heuristic(text: str) -> ComplaintFields:
     요청사항 = _first(_REQ_PAT, t)
     현상     = first or ""
 
-    # 간단 보강
     if not 위험성 and ("주정차" in (문제점 + " " + t)):
         위험성 = "보행자·차량 시야 방해로 사고 위험"
     if not 요청사항 and ("주정차" in (문제점 + " " + t)):
@@ -81,7 +79,7 @@ def _ollama_ok() -> bool:
     if not USE_LLM:
         return False
     try:
-        r = requests.get(f"{OLLAMA_URL}/api/tags", timeout=CONNECT_TIMEOUT)
+        r = requests.get(f"{OLLAMA_BASE}/api/tags", timeout=CONNECT_TIMEOUT)
         return r.status_code == 200
     except Exception:
         return False
@@ -115,7 +113,7 @@ def _llm_fill_missing(base_text: str, locked: ComplaintFields) -> Optional[Compl
     }
     try:
         r = requests.post(
-            f"{OLLAMA_URL}/api/chat", json=payload,
+            f"{OLLAMA_BASE}/api/chat", json=payload,
             timeout=(CONNECT_TIMEOUT, READ_TIMEOUT)
         )
         r.raise_for_status()
@@ -152,22 +150,18 @@ def run_extract(req: SummarizeRequest) -> ComplaintFields:
     """
     텍스트(+이미지 URL을 힌트 문자열로만 결합) → (휴리스틱) → 부족하면 LLM 보강 → 결과
     """
-    # 1) 텍스트 + URL 힌트 결합
+    # 텍스트 + URL 힌트 결합
     text = _normalize(getattr(req, "complaint_text", "") or "")
-    url_hint = _urls_hint(getattr(req, "images", []))  # URL만 문자열로 참고
+    url_hint = _urls_hint(getattr(req, "images", []))
     joined = " ".join([t for t in [text, url_hint] if t]).strip()
 
-    # 2) 휴리스틱 1차
     fields_rule = _heuristic(joined)
 
-    # 충분히 채워졌거나 LLM 불가 → 바로 반환
     if _score(fields_rule) >= 6 or not _ollama_ok():
-        return fields_rule
+        return tidy_fields(fields_rule)
 
-    # 3) LLM으로 부족한 칸 보강 (잠금 우선)
     fields_llm = _llm_fill_missing(joined, fields_rule)
     if fields_llm:
-        return fields_llm
+        return tidy_fields(fields_llm)
 
-    # 4) 실패 시 휴리스틱 결과로 폴백
-    return fields_rule
+    return tidy_fields(fields_rule)

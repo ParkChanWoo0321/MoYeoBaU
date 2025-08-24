@@ -82,7 +82,7 @@ public class ComplaintService {
 
     @Transactional
     public ComplaintResponseDto createComplaint(ComplaintRequestDto dto) {
-        // 0) 최소 요건: 주소 유효 + (내용 or 이미지 중 하나는 존재)
+        // 최소 요건: 주소 유효 + (내용 or 이미지 중 하나는 존재)
         if (isBlank(dto.getAddress()) || !SeosanRegion.isValid(dto.getAddress())) {
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "지역은 서산시 읍·면·동 중에서 선택해 주세요.");
         }
@@ -104,7 +104,7 @@ public class ComplaintService {
                         .complaintText(firstNotBlank(
                                 content,
                                 docMd,
-                                asPlainText(docHtml)  // HTML 본문이 왔으면 텍스트로 정리
+                                asPlainText(docHtml)
                         ))
                         .images(imageUrls.stream().map(AiMinwonClient.ImageInput::fromUrl).toList())
                         .meta(defaultSeosanMeta(null))
@@ -125,8 +125,8 @@ public class ComplaintService {
                 }
 
                 // 카테고리 후보 → enum 매핑
-                var candidates = extractCategories(out.getFields()); // List<String>
-                var enums = mapCategoryNamesToEnum(candidates);      // List<ComplaintCategory>
+                var candidates = extractCategories(out.getFields());
+                var enums = mapCategoryNamesToEnum(candidates);
 
                 // 후보가 비면 텍스트 기반 간이 추정
                 if (enums.isEmpty()) {
@@ -138,14 +138,14 @@ public class ComplaintService {
                     }
                 }
 
-                // 마지막 보루(정말 못 찾은 경우): 기타행정으로 기본값
+                // 정말 못 찾은 경우 기타행정으로 기본값
                 if (enums.isEmpty()) {
                     enums = List.of(ComplaintCategory.OTHERS_ADMIN);
                 }
                 dto.setCategories(enums);
 
             } catch (Exception e) {
-                // AI 호출 실패 시에도 서비스가 막히지 않도록 최소한의 동작
+                // AI 호출 실패 시에도 서비스가 막히지 않도록 하는 코드
                 var fallback = toCategoryEnum(firstNotBlank(content, docMd, asPlainText(docHtml)));
                 dto.setCategories(fallback != null
                         ? List.of(fallback)
@@ -161,18 +161,17 @@ public class ComplaintService {
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "카테고리를 선택해 주세요.");
         }
 
-        // 3) 저장
-        Complaint entity = toEntity(dto);        // 이 메서드는 dto의 title/address/content/categories 매핑 포함
+        // 저장
+        Complaint entity = toEntity(dto);
         if (hasImages) entity.setImageUrl(imageUrls.get(0));
 
         if (notBlank(docHtml)) {
             entity.setDocHtml(docHtml);
-            entity.setComposeStatus(ComposeStatus.COMPOSED); // 또는 EDITED (아래 enum 확장 참고)
+            entity.setComposeStatus(ComposeStatus.COMPOSED);
         } else if (notBlank(docMd)) {
             entity.setDocMarkdown(docMd);
             entity.setComposeStatus(ComposeStatus.COMPOSED);
         } else {
-            // content 텍스트로만 등록하는 케이스
             entity.setComposeStatus(ComposeStatus.NONE);
         }
 
@@ -186,7 +185,7 @@ public class ComplaintService {
     private List<ComplaintCategory> mapCategoryNamesToEnum(List<String> names) {
         if (names == null || names.isEmpty()) return List.of();
         return names.stream()
-                .map(this::toCategoryEnum)   // 한 개 라벨을 enum으로
+                .map(this::toCategoryEnum)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -199,11 +198,11 @@ public class ComplaintService {
                 .trim();
     }
 
-    // 라벨 하나 -> enum 하나 (네 enum 값에 맞춘 매핑)
+    // 라벨 하나 -> enum 하나
     private ComplaintCategory toCategoryEnum(String name) {
         String k = normalizeCat(name);
 
-        // 1) enum 명칭/직역에 가까운 표현
+        // enum 명칭에 가까운 표현
         if (k.equals("environmentcleaning") || k.equals("환경청소")) return ComplaintCategory.ENVIRONMENT_CLEANING;
         if (k.equals("facilitydamage")      || k.equals("시설물파손") || k.equals("시설물관리")) return ComplaintCategory.FACILITY_DAMAGE;
         if (k.equals("trafficparking")      || k.equals("교통주정차")) return ComplaintCategory.TRAFFIC_PARKING;
@@ -211,7 +210,7 @@ public class ComplaintService {
         if (k.equals("livinginconvenience") || k.equals("생활불편"))   return ComplaintCategory.LIVING_INCONVENIENCE;
         if (k.equals("othersadmin")         || k.equals("기타행정")   || k.equals("행정"))     return ComplaintCategory.OTHERS_ADMIN;
 
-        // 2) 일반적인 키워드 매핑(한국어/영어 혼합, 공백/슬래시 제거 기준)
+        // 키워드 매핑
         if (k.contains("주차") || k.contains("교통") || k.contains("parking") || k.contains("traffic") || k.contains("이중주차") || k.contains("불법주정차"))
             return ComplaintCategory.TRAFFIC_PARKING;
 
@@ -241,7 +240,7 @@ public class ComplaintService {
         return null; // 매핑 실패 시 null (상위에서 filter)
     }
 
-    // 라벨 정규화(공백/슬래시/하이픈 제거 + 영어 소문자화)
+    // 라벨 정규화
     private String normalizeCat(String s) {
         if (s == null) return "";
         String t = s.replaceAll("\\s+", "")  // 공백 제거

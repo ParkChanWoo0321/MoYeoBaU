@@ -2,8 +2,7 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: seosan-ollama
-    ports:
-      - "11434:11434"
+
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
@@ -18,8 +17,6 @@ services:
       context: ./ai_service
       dockerfile: Dockerfile
     container_name: seosan-ai
-    ports:
-      - "8000:8000"
     environment:
       - OLLAMA_BASE=http://ollama:11434
       - OLLAMA_MODEL=qwen2.5:3b-instruct
@@ -38,11 +35,13 @@ services:
   backend:
     build:
       context: .
+      dockerfile: Dockerfile
     container_name: seosan-backend
-    ports:
-      - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      APP_UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
     depends_on:
       ai:
         condition: service_healthy
@@ -56,8 +55,7 @@ services:
       MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: seosancomplain
       TZ: Asia/Seoul
-    ports:
-      - "3307:3306"
+
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -66,6 +64,31 @@ services:
       timeout: 5s
       retries: 8
 
+  nginx:
+    image: nginx:alpine
+    container_name: seosan-nginx
+    depends_on:
+      - backend
+      - ai
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot-www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+      - uploads:/app/uploads:ro
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    container_name: seosan-certbot
+    volumes:
+      - certbot-www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
 volumes:
   mysql_data:
   ollama_data:
+  uploads:
+  certbot-www:
+  letsencrypt:

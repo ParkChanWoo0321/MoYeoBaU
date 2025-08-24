@@ -48,7 +48,7 @@ public class WebClientConfig {
                         .addHandlerLast(new WriteTimeoutHandler(writeTimeoutSecs, TimeUnit.SECONDS))
                 );
 
-        // buffer 사이즈 파싱 (DataSize 사용)
+
         int maxBytes = parseMaxInMemoryBytes(maxInMemorySize);
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
@@ -59,19 +59,18 @@ public class WebClientConfig {
                 .baseUrl(baseUrl)
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .exchangeStrategies(strategies)
-                // 기본 Accept를 JSON으로(필요 시 개별 호출에서 override)
                 .defaultHeaders(h -> h.set("Accept", "application/json"))
                 .build();
     }
 
     private int parseMaxInMemoryBytes(String size) {
         try {
-            DataSize ds = DataSize.parse(size);   // "16MB", "8MB", "2048KB", "1048576B", "1048576"
+            DataSize ds = DataSize.parse(size);
             long bytes = ds.toBytes();
             if (bytes > Integer.MAX_VALUE) return Integer.MAX_VALUE;
             return (int) bytes;
         } catch (Exception ignore) {
-            return 16 * 1024 * 1024; // fallback 16MB
+            return 16 * 1024 * 1024;
         }
     }
 }
