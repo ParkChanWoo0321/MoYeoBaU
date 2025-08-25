@@ -4,10 +4,10 @@ from .fields import ComplaintFields
 from .textutils_ko import tidy_meta, tidy_fields, tidy_title, render_body
 
 USE_LLM_COMPOSE = os.getenv("COMPOSE_USE_LLM", "0") == "1"
-OLLAMA_BASE   = os.getenv("OLLAMA_BASE", "http://127.0.0.1:11434").rstrip("/")
-OLLAMA_MODEL  = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct")
-LLM_CONNECT_TO = int(os.getenv("COMPOSE_CONNECT_TIMEOUT", "2"))
-LLM_READ_TO    = int(os.getenv("COMPOSE_READ_TIMEOUT", "8"))
+OLLAMA_BASE     = os.getenv("OLLAMA_BASE", "http://127.0.0.1:11434").rstrip("/")
+OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct")
+LLM_CONNECT_TO  = int(os.getenv("COMPOSE_CONNECT_TIMEOUT", "2"))
+LLM_READ_TO     = int(os.getenv("COMPOSE_READ_TIMEOUT", "8"))
 
 def _norm(s: str) -> str:
     import re
@@ -62,7 +62,6 @@ def _fallback_template(f: ComplaintFields, meta: Dict[str, Any], include_html: b
         result["html"] = "<!-- omitted in MVP -->"
     return result
 
-
 def compose_document(fields: ComplaintFields, meta: Dict[str, Any], include_html: bool = False) -> Dict[str, str]:
     meta = tidy_meta(meta)
     fields = tidy_fields(fields)
@@ -88,7 +87,6 @@ JSON만:
         m = re.search(r"\{[\s\S]*\}", txt)
         obj = json.loads(m.group(0)) if m else None
         if isinstance(obj, dict) and obj.get("title"):
-            # LLM이 준 제목을 정리 + prefix 적용
             title_raw = obj["title"].strip()
             title = tidy_title(title_raw)
             pref = _norm(meta.get("title_prefix",""))
@@ -98,8 +96,7 @@ JSON만:
 
             base = _fallback_template(fields, meta, include_html=include_html)
             base["title"] = title
-            # 본문은 항상 템플릿 조립(LLM 본문 미사용)
-            base["body"] = render_body(meta, fields)
+            base["body"]  = render_body(meta, fields)
             return base
     except Exception:
         pass

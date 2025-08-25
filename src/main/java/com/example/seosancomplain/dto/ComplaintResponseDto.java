@@ -18,7 +18,7 @@ public class ComplaintResponseDto {
     private String title;
     private String content;
     private String address;
-    private List<ComplaintCategory> categories;
+    private ComplaintCategory category;
     private String status;
     private List<String> imageUrls;
     private String userName;

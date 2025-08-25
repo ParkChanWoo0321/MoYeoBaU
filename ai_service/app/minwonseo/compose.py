@@ -5,7 +5,7 @@ from .io import ImageInput
 from .fields import ComplaintFields
 
 class ComposeIn(BaseModel):
-    # 바디에 모르는게 와도 ignore한다
+
     model_config = ConfigDict(extra="ignore")
 
     # 본문/이미지
@@ -14,7 +14,7 @@ class ComposeIn(BaseModel):
 
     fields: Optional[ComplaintFields] = None
 
-    # 서산 기본 meta 자동 주입
+    # 서산 기본 meta
     meta: Dict[str, Any] = Field(default_factory=lambda: {
         "org": "서산시청",
         "receiver": "서산시청장 귀하",

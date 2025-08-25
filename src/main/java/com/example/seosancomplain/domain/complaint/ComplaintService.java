@@ -82,7 +82,6 @@ public class ComplaintService {
 
     @Transactional
     public ComplaintResponseDto createComplaint(ComplaintRequestDto dto) {
-        // 최소 요건: 주소 유효 + (내용 or 이미지 중 하나는 존재)
         if (isBlank(dto.getAddress()) || !SeosanRegion.isValid(dto.getAddress())) {
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "지역은 서산시 읍·면·동 중에서 선택해 주세요.");
         }
@@ -97,8 +96,8 @@ public class ComplaintService {
             throw new CustomException(ErrorCode.VALIDATION_FAIL,
                     "민원서 내용이 비어 있습니다. AI 작성 결과를 반영해 제목/본문을 채워 주세요.");
         }
-        // 카테고리
-        if (dto.getCategories() == null || dto.getCategories().isEmpty()) {
+
+        if (dto.getCategory() == null) {
             try {
                 var in = AiMinwonClient.AiComposeIn.builder()
                         .complaintText(firstNotBlank(
@@ -112,7 +111,6 @@ public class ComplaintService {
 
                 var out = aiMinwonClient.compose(in);
 
-                // 제목/본문이 비어 있으면 AI 결과로 채워주기
                 if (isBlank(dto.getTitle())) {
                     dto.setTitle(firstNotBlank(out.getTitle(), "민원서"));
                 }
@@ -124,32 +122,17 @@ public class ComplaintService {
                     content  = firstNotBlank(content, out.getBody());
                 }
 
-                // 카테고리 후보 → enum 매핑
                 var candidates = extractCategories(out.getFields());
                 var enums = mapCategoryNamesToEnum(candidates);
-
-                // 후보가 비면 텍스트 기반 간이 추정
-                if (enums.isEmpty()) {
-                    var guess = toCategoryEnum(firstNotBlank(
-                            content, out.getBody(), out.getTitle()
-                    ));
-                    if (guess != null) {
-                        enums = List.of(guess);
-                    }
-                }
-
-                // 정말 못 찾은 경우 기타행정으로 기본값
-                if (enums.isEmpty()) {
-                    enums = List.of(ComplaintCategory.OTHERS_ADMIN);
-                }
-                dto.setCategories(enums);
+                ComplaintCategory chosen = enums.isEmpty()
+                        ? toCategoryEnum(firstNotBlank(content, out.getBody(), out.getTitle()))
+                        : enums.get(0);
+                if (chosen == null) chosen = ComplaintCategory.OTHERS_ADMIN;
+                dto.setCategory(chosen);
 
             } catch (Exception e) {
-                // AI 호출 실패 시에도 서비스가 막히지 않도록 하는 코드
                 var fallback = toCategoryEnum(firstNotBlank(content, docMd, asPlainText(docHtml)));
-                dto.setCategories(fallback != null
-                        ? List.of(fallback)
-                        : List.of(ComplaintCategory.OTHERS_ADMIN));
+                dto.setCategory(fallback != null ? fallback : ComplaintCategory.OTHERS_ADMIN);
                 if (isBlank(dto.getTitle())) dto.setTitle("민원서");
             }
         }
@@ -157,11 +140,10 @@ public class ComplaintService {
         if (isBlank(dto.getTitle())) {
             dto.setTitle("민원서");
         }
-        if (dto.getCategories() == null || dto.getCategories().isEmpty()) {
+        if (dto.getCategory() == null) {
             throw new CustomException(ErrorCode.VALIDATION_FAIL, "카테고리를 선택해 주세요.");
         }
 
-        // 저장
         Complaint entity = toEntity(dto);
         if (hasImages) entity.setImageUrl(imageUrls.get(0));
 
@@ -181,7 +163,7 @@ public class ComplaintService {
         return toDto(entity);
     }
 
-    // 라벨 리스트 -> enum 리스트
+    // ▼▼▼ 카테고리 관련 메서드: 아래(두 번째) 코드 버전 사용 ▼▼▼
     private List<ComplaintCategory> mapCategoryNamesToEnum(List<String> names) {
         if (names == null || names.isEmpty()) return List.of();
         return names.stream()
@@ -198,11 +180,9 @@ public class ComplaintService {
                 .trim();
     }
 
-    // 라벨 하나 -> enum 하나
     private ComplaintCategory toCategoryEnum(String name) {
         String k = normalizeCat(name);
 
-        // enum 명칭에 가까운 표현
         if (k.equals("environmentcleaning") || k.equals("환경청소")) return ComplaintCategory.ENVIRONMENT_CLEANING;
         if (k.equals("facilitydamage")      || k.equals("시설물파손") || k.equals("시설물관리")) return ComplaintCategory.FACILITY_DAMAGE;
         if (k.equals("trafficparking")      || k.equals("교통주정차")) return ComplaintCategory.TRAFFIC_PARKING;
@@ -210,7 +190,6 @@ public class ComplaintService {
         if (k.equals("livinginconvenience") || k.equals("생활불편"))   return ComplaintCategory.LIVING_INCONVENIENCE;
         if (k.equals("othersadmin")         || k.equals("기타행정")   || k.equals("행정"))     return ComplaintCategory.OTHERS_ADMIN;
 
-        // 키워드 매핑
         if (k.contains("주차") || k.contains("교통") || k.contains("parking") || k.contains("traffic") || k.contains("이중주차") || k.contains("불법주정차"))
             return ComplaintCategory.TRAFFIC_PARKING;
 
@@ -237,49 +216,17 @@ public class ComplaintService {
         if (k.contains("행정") || k.contains("기타") || k.contains("other") || k.contains("admin"))
             return ComplaintCategory.OTHERS_ADMIN;
 
-        return null; // 매핑 실패 시 null (상위에서 filter)
+        return null;
     }
 
-    // 라벨 정규화
     private String normalizeCat(String s) {
         if (s == null) return "";
-        String t = s.replaceAll("\\s+", "")  // 공백 제거
+        String t = s.replaceAll("\\s+", "")
                 .replace("/", "")
                 .replace("-", "");
         return t.toLowerCase(java.util.Locale.ROOT);
     }
 
-
-    private JsonNode toJsonNode(Object v) {
-        if (v == null) return NullNode.getInstance();
-        if (v instanceof JsonNode jn) return jn;
-        if (v instanceof String s) {
-            try { return objectMapper.readTree(s); }
-            catch (Exception e) { return NullNode.getInstance(); }
-        }
-        return objectMapper.valueToTree(v);  // Map/POJO -> JsonNode
-    }
-
-    private boolean isBlank(String s) { return s == null || s.isBlank(); }
-    private boolean notBlank(String s) { return s != null && !s.isBlank(); }
-
-    private String firstNotBlank(String... vals) {
-        if (vals == null) return null;
-        for (String v : vals) if (notBlank(v)) return v;
-        return null;
-    }
-
-    // 서산 기본 메타 주입
-    private Map<String, Object> defaultSeosanMeta(Map<String, Object> in) {
-        Map<String, Object> meta = new HashMap<>();
-        if (in != null) meta.putAll(in);
-        meta.putIfAbsent("org", "서산시청");
-        meta.putIfAbsent("receiver", "서산시청장 귀하");
-        meta.putIfAbsent("title_prefix", "[서산시]");
-        return meta;
-    }
-
-    // AI fields에서 카테고리/주소 후보 추출
     private List<String> extractCategories(JsonNode fields) {
         if (fields == null) return List.of();
 
@@ -302,13 +249,41 @@ public class ComplaintService {
 
         return List.of();
     }
+    // ▲▲▲ 카테고리 관련 메서드 끝 ▲▲▲
+
+    private JsonNode toJsonNode(Object v) {
+        if (v == null) return NullNode.getInstance();
+        if (v instanceof JsonNode jn) return jn;
+        if (v instanceof String s) {
+            try { return objectMapper.readTree(s); }
+            catch (Exception e) { return NullNode.getInstance(); }
+        }
+        return objectMapper.valueToTree(v);
+    }
+
+    private boolean isBlank(String s) { return s == null || s.isBlank(); }
+    private boolean notBlank(String s) { return s != null && !s.isBlank(); }
+
+    private String firstNotBlank(String... vals) {
+        if (vals == null) return null;
+        for (String v : vals) if (notBlank(v)) return v;
+        return null;
+    }
+
+    private Map<String, Object> defaultSeosanMeta(Map<String, Object> in) {
+        Map<String, Object> meta = new HashMap<>();
+        if (in != null) meta.putAll(in);
+        meta.putIfAbsent("org", "서산시청");
+        meta.putIfAbsent("receiver", "서산시청장 귀하");
+        meta.putIfAbsent("title_prefix", "[서산시]");
+        return meta;
+    }
 
     private String textOrNull(JsonNode node, String key) {
         if (node == null) return null;
         var v = node.path(key);
         return v.isMissingNode() || v.isNull() ? null : v.asText(null);
     }
-
 
     public List<ComplaintResponseDto> getMyComplaints(String userName, String phoneNumber) {
         return complaintRepository.findByUserNameAndPhoneNumber(userName, phoneNumber)
@@ -422,22 +397,18 @@ public class ComplaintService {
         if (dto.getAddress() != null) complaint.setAddress(dto.getAddress());
         if (dto.getUserName() != null) complaint.setUserName(dto.getUserName());
         if (dto.getPhoneNumber() != null) complaint.setPhoneNumber(dto.getPhoneNumber());
-        if (dto.getCategories() != null) {
-            LinkedHashSet<ComplaintCategory> cats = new LinkedHashSet<>(dto.getCategories());
-            if (cats.isEmpty()) throw new CustomException(ErrorCode.VALIDATION_FAIL, "카테고리는 최소 1개 이상이어야 합니다.");
-            complaint.getCategories().clear();
-            complaint.getCategories().addAll(cats);
+        if (dto.getCategory() != null) {
+            complaint.setCategory(dto.getCategory());
         }
     }
 
     private Complaint toEntity(ComplaintRequestDto dto) {
-        LinkedHashSet<ComplaintCategory> cats = new LinkedHashSet<>(dto.getCategories() == null ? List.of() : dto.getCategories());
-        if (cats.isEmpty()) throw new CustomException(ErrorCode.VALIDATION_FAIL, "카테고리는 최소 1개 이상이어야 합니다.");
+        if (dto.getCategory() == null) throw new CustomException(ErrorCode.VALIDATION_FAIL, "카테고리를 선택해 주세요.");
         return Complaint.builder()
                 .title(dto.getTitle())
                 .content(dto.getContent())
                 .address(dto.getAddress())
-                .categories(cats)
+                .category(dto.getCategory())
                 .imageUrl((dto.getImageUrls() != null && !dto.getImageUrls().isEmpty())
                         ? dto.getImageUrls().getFirst() : null)
                 .userName(dto.getUserName())
@@ -453,7 +424,7 @@ public class ComplaintService {
                 .title(c.getTitle())
                 .content(c.getContent())
                 .address(c.getAddress())
-                .categories(new ArrayList<>(c.getCategories()))
+                .category(c.getCategory())
                 .status(c.getStatus() != null ? c.getStatus().name() : null)
                 .imageUrls(buildImageUrlsFor(c))
                 .userName(c.getUserName())
@@ -490,7 +461,7 @@ public class ComplaintService {
                 .title(c.getTitle())
                 .content(c.getContent())
                 .address(c.getAddress())
-                .categories(new ArrayList<>(c.getCategories()))
+                .category(c.getCategory())
                 .status(c.getStatus())
                 .userName(c.getUserName())
                 .phoneNumber(formatPhone(c.getPhoneNumber()))
@@ -793,7 +764,6 @@ public class ComplaintService {
         m.put("request", "");
         return m;
     }
-
     @Transactional
     public Map<String, String> ensureSummaryFields(Long complaintId) {
         Complaint c = complaintRepository.findById(complaintId)
@@ -847,6 +817,7 @@ public class ComplaintService {
         return normalized;
     }
 
+
     private List<byte[]> fetchImageBytesFromFilePath(Long complaintId) {
         List<byte[]> out = new ArrayList<>();
         try {
@@ -870,7 +841,6 @@ public class ComplaintService {
         if (u.startsWith("/")) return publicBaseUrl + u;
         return publicBaseUrl + "/" + u;
     }
-
     private List<String> buildImageUrlsFor(Complaint c) {
         LinkedHashSet<String> set = new LinkedHashSet<>();
         var atts = attachmentRepository.findByComplaintIdOrderByUploadedAtAsc(c.getId());

@@ -8,11 +8,15 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.List;
@@ -27,22 +31,25 @@ public class AiMinwonClient {
 
     /** JSON 방식 호출: /ai/minwon/compose */
     public AiComposeOut compose(AiComposeIn in) {
-        try {
             return aiMinwonWebClient.post()
                     .uri("/ai/minwon/compose")
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
                     .bodyValue(in)
                     .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, resp ->
+                            resp.bodyToMono(String.class).flatMap(b ->
+                                    Mono.error(new ResponseStatusException(HttpStatus.BAD_REQUEST, b))
+                            )
+                    )
+                    .onStatus(
+                            HttpStatusCode::is5xxServerError,
+                            resp -> resp.bodyToMono(String.class).map(body ->
+                                    new org.springframework.web.server.ResponseStatusException(
+                                            resp.statusCode(), "[AI 5xx] " + body))
+                    )
                     .bodyToMono(AiComposeOut.class)
                     .block(Duration.ofSeconds(60));
-        } catch (WebClientResponseException e) {
-            log.warn("[AI] compose HTTP {}: {}", e.getRawStatusCode(), e.getResponseBodyAsString());
-            throw new AiComposeException("AI 서버 응답 오류: " + e.getRawStatusCode(), e);
-        } catch (Exception e) {
-            log.error("[AI] compose 실패", e);
-            throw new AiComposeException("AI 서버 호출 실패", e);
-        }
     }
 
     /** (선택) 멀티파트 폼 호출: /ai/minwon/compose-form */

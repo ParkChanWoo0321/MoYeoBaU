@@ -12,6 +12,8 @@ from app.minwonseo.composer import compose_document
 from app.minwonseo.fields import ComplaintFields
 from fastapi import Form, File, UploadFile
 from fastapi import UploadFile as _UploadFile
+from app.minwonseo.extractor import run_extract
+
 
 try:
     from anyio import TimeoutError as AnyioTimeoutError
@@ -21,7 +23,10 @@ except Exception:
     except Exception:
         AnyioTimeoutError = TimeoutError
 
-app = FastAPI(title="Seosan AI Service (Ollama Summarizer)")
+app = FastAPI(
+    title="Seosan AI Service (Ollama Summarizer)",
+    docs_url="/ai/docs",
+    openapi_url="/ai/openapi.json")
 
 OLLAMA_BASE = os.getenv("OLLAMA_BASE", "http://ollama:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct")
@@ -43,7 +48,6 @@ FALLBACK_INPUT_LIMIT   = int(os.getenv("FALLBACK_INPUT_LIMIT", "1200"))
 
 IGNORE_IMAGES_DEFAULT  = os.getenv("IGNORE_IMAGES_DEFAULT", "0") in ("1", "true", "True")
 CAPTION_ENABLED        = os.getenv("CAPTION_ENABLED", "1") in ("1", "true", "True")
-HANDLER_TIMEOUT_SECS   = int(os.getenv("HANDLER_TIMEOUT_SECS", "180"))
 STRICT_NO_HEURISTIC    = os.getenv("STRICT_NO_HEURISTIC", "0") in ("1","true","True")
 _Q_MIN_CHARS = 30
 
@@ -560,36 +564,6 @@ def _json_to_request(data: dict) -> SummarizeRequest:
         meta = {}
     return SummarizeRequest(complaint_text=ct, images=norm_imgs, meta=meta)
 
-def _run(req: SummarizeRequest, deadline: Optional[float] = None, mode: str = "") -> ComplaintFields:
-    use_images = not bool(req.meta.get("ignore_images", IGNORE_IMAGES_DEFAULT))
-    captions = _get_captions(req.images) if (req.images and use_images) else []
-    clean_text = _ko_cleanup_noise(_cap_input(req.complaint_text, HARD_INPUT_LIMIT))
-    joined = _compose_input(clean_text, captions)
-    if mode == "heuristic":
-        if STRICT_NO_HEURISTIC:
-            raise HTTPException(status_code=502, detail="llm-unavailable")
-        return _heuristic_extract_fields(joined)
-    if mode == "llm":
-        if _ollama_available():
-            f = _ollama_structured_with_fallback(joined, deadline=deadline)
-            if not any(getattr(f, k) for k in _JSON_KEYS):
-                raise HTTPException(status_code=502, detail="llm-empty")
-            return f
-        raise HTTPException(status_code=502, detail="ollama-unavailable")
-    if _remaining(deadline) < 8:
-        if STRICT_NO_HEURISTIC:
-            raise HTTPException(status_code=502, detail="llm-unavailable")
-        return _heuristic_extract_fields(joined)
-    if _ollama_available():
-        fields = _ollama_structured_with_fallback(joined, deadline=deadline)
-    else:
-        if STRICT_NO_HEURISTIC:
-            raise HTTPException(status_code=502, detail="ollama-unavailable")
-        fields = _heuristic_extract_fields(joined)
-    if not any(getattr(fields, k) for k in _JSON_KEYS):
-        fields = _heuristic_extract_fields(joined)
-    return fields
-
 def _wants_json(request: Request, req_meta: Dict[str, Any]) -> bool:
     if request.query_params.get("format", "").lower() == "json":
         return True
@@ -618,43 +592,23 @@ def _fields_to_dict(fields: ComplaintFields, lang: str = "ko") -> dict:
             "위험성": fields.위험성 or "",
             "요청사항": fields.요청사항 or "",
         }
+def _is_blank(v: str) -> bool:
+    return (v is None) or (str(v).strip() == "") or (str(v).strip() == "미상")
 
-def _assess_text_quality(text: str) -> Dict[str, Any]:
-    t = _normalize(text)
-    if not t:
-        return {"poor": True, "score": 0, "missing": ["위치","문제점","요청사항"]}
+def _merge_kofields(base: dict, fill: dict) -> dict:
+    keys = ["위치", "현상", "문제점", "위험성", "요청사항"]
+    merged = {}
+    for k in keys:
+        bv = (getattr(base, k, None) if hasattr(base, k) else base.get(k))
+        fv = (getattr(fill, k, None) if hasattr(fill, k) else fill.get(k))
+        merged[k] = (bv if not _is_blank(bv) else (fv or "")) or ""
+    return merged
 
-    score, missing = 0, []
-    if len(t) >= _Q_MIN_CHARS: score += 1
-
-    has_addr = bool(_ADDR_PAT.search(t))
-    has_prob = bool(_PROB_PAT.search(t))
-    has_req  = bool(_REQ_PAT.search(t))
-    has_risk = bool(_RISK_PAT.search(t))
-
-    score += int(has_addr) + int(has_prob) + int(has_req)
-
-    if not has_addr: missing.append("위치")
-    if not has_prob: missing.append("문제점")
-    if not has_req:  missing.append("요청사항")
-    if not has_risk: missing.append("위험성")
-
-    has_dup = bool(re.search(r"\b(\S+)\s+\1\b", t))
-    if has_dup: score -= 1
-
-    poor = (score <= 1) or (sum([not has_addr, not has_prob, not has_req]) >= 2)
-    return {"poor": poor, "score": score, "missing": missing}
-
-def _empty_keys(f: ComplaintFields) -> List[str]:
-    return [k for k in _JSON_KEYS if not getattr(f, k)]
-
-def _merge_fields(primary: ComplaintFields, fallback: ComplaintFields) -> ComplaintFields:
-    data = {}
-    for k in _JSON_KEYS:
-        v = getattr(primary, k) or ""
-        data[k] = v.strip() or (getattr(fallback, k) or "")
-    return ComplaintFields(**data)
-
+def _as_kofields(obj) -> ComplaintFields:
+    # dict 또는 ComplaintFields 모두 수용
+    if isinstance(obj, ComplaintFields):
+        return obj
+    return ComplaintFields(**obj)
 
 @app.get("/health")
 def healthcheck():
@@ -736,69 +690,52 @@ async def summarize(request: Request):
 @app.post("/ai/minwon/extract", response_model=ComplaintFields, tags=["ai-minwon"])
 def api_extract(req: SummarizeRequest):
     try:
-        return _run(req)
+        return run_extract(req)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"extract failed: {e}")
 
 @app.post("/ai/minwon/compose", response_model=ComposeOut, tags=["ai-minwon"])
 def api_compose(body: ComposeIn):
     try:
-
-
         meta = {**DEFAULT_META, **(body.meta or {})}
 
-        # 최소 입력 검증: fields / 텍스트 / 이미지 모두 없으면 에러
-        if (not body.fields) and not (body.complaint_text or "") and not (body.images or []):
+        has_fields = bool(body.fields)
+        has_text   = bool((body.complaint_text or "").strip())
+        has_images = bool(body.images)
+        if not (has_fields or has_text or has_images):
             raise HTTPException(status_code=400, detail="complaint_text / images / fields 중 하나는 필요합니다.")
 
         complaint_text = body.complaint_text or ""
         images = body.images or []
 
-
-        def _run_once(mode: str = "") -> ComplaintFields:
+        #  필드 확보
+        if has_fields:
+            base_fields = _as_kofields(body.fields)
             req = SummarizeRequest(
                 complaint_text=complaint_text,
                 images=images,
-                meta={**meta, "ignore_images": False}
+                meta={**meta, "ignore_images": False},
             )
-
-            deadline = time.time() + max(5, HANDLER_TIMEOUT_SECS - 1)
-            return _run(req, deadline, mode)
-
-        if body.fields:
-            base = body.fields
-            missing0 = _empty_keys(base)
-            if missing0:
-                f1 = _run_once("llm") if images else _run_once("")
-                merged = _merge_fields(base, f1)
-
-                if _empty_keys(merged):
-                    f2 = _run_once("heuristic")
-                    merged = _merge_fields(merged, f2)
-                fields = merged
-            else:
-                fields = base
-
+            extracted = _as_kofields(run_extract(req))
+            merged = _merge_kofields(
+                base_fields.__dict__, extracted.__dict__
+            )
+            fields = _as_kofields(merged)
         else:
-            q = _assess_text_quality(complaint_text)
-            prefer_llm = bool(images) and q["poor"]  # 사진+부실 → LLM 경로 우선
-            mode0 = "llm" if prefer_llm else ""
+            req = SummarizeRequest(
+                complaint_text=complaint_text,
+                images=images,
+                meta={**meta, "ignore_images": False},
+            )
+            fields = _as_kofields(run_extract(req))
 
-            fields = _run_once(mode0)
-
-            # 결과에 빈칸이 있으면 LLM 한 번 더(사진 단서 최대 반영)
-            if _empty_keys(fields) and images:
-                f_llm = _run_once("llm")
-                fields = _merge_fields(fields, f_llm)
-
-            if _empty_keys(fields):
-                f_h = _run_once("heuristic")
-                fields = _merge_fields(fields, f_h)
-
+        # 문서 조립
         result = compose_document(fields, meta, include_html=False)
-        title = result.get("title") or f"{meta.get('title_prefix','')} 민원 신청의 건"
+        title = (result.get("title") or f"{meta.get('title_prefix','')} 민원 신청의 건").strip()
+
+        # 반환
         return ComposeOut(
-            title=title.strip(),
+            title=title,
             body=result.get("body", ""),
             fields=fields,
         )
@@ -806,6 +743,9 @@ def api_compose(body: ComposeIn):
     except HTTPException:
         raise
     except Exception as e:
+        import traceback, sys
+        print("compose error:", e, file=sys.stderr)
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"compose failed: {e}")
 
 if __name__ == "__main__":
