@@ -12,6 +12,9 @@ CONNECT_TIMEOUT  = int(os.getenv("EXTRACT_CONNECT_TIMEOUT", "2"))
 READ_TIMEOUT     = int(os.getenv("EXTRACT_READ_TIMEOUT", "8"))
 
 # ===== 유틸 =====
+def _run(req, *args, **kwargs):
+    return run_extract(req)
+
 def _normalize(text: str) -> str:
     t = (text or "").strip()
     t = re.sub(r"\s+", " ", t)

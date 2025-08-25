@@ -12,8 +12,7 @@ from app.minwonseo.composer import compose_document
 from app.minwonseo.fields import ComplaintFields
 from fastapi import Form, File, UploadFile
 from fastapi import UploadFile as _UploadFile
-from app.minwonseo.extractor import run_extract
-
+from app.minwonseo.extractor import _run
 
 try:
     from anyio import TimeoutError as AnyioTimeoutError
