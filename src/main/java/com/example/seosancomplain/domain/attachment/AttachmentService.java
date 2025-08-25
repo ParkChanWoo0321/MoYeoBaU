@@ -20,7 +20,7 @@ public class AttachmentService {
     private final AttachmentRepository attachmentRepository;
 
     @Value("${file.upload-dir:${user.dir}/uploads}")
-    private String uploadDir;  // WebConfig와 같은 키 사용
+    private String uploadDir;
 
     public Attachment save(MultipartFile file) throws IOException {
         String fileName = FileUtil.generateUniqueFileName(Objects.requireNonNull(file.getOriginalFilename()));

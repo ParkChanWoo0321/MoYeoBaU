@@ -47,7 +47,6 @@ public class Complaint {
 
     private String imageUrl;              // 첨부사진 URL
 
-    // 익명 본인확인(접수, 수정, 삭제 시 사용)
     private String userName;              // 이름(본인확인용)
     private String phoneNumber;           // 연락처(본인확인용)
 
