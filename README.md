@@ -1,15 +1,8 @@
-<div align="center">
+
 
 # 📢 온민원
 
 ### 일반 사용자와 관리자를 연결하는 AI 기반 스마트 민원 관리 서비스
-
-![Platform](https://img.shields.io/badge/Platform-Web-blue)
-![Service](https://img.shields.io/badge/Service-Civil%20Complaint%20Management-green)
-![AI](https://img.shields.io/badge/AI-Enabled-orange)
-![Status](https://img.shields.io/badge/Status-Development-lightgrey)
-
-</div>
 
 ---
 
